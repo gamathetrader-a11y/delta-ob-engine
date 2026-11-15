@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#131722">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Delta Exchange India Live Chart — Order Block & Impulse-Retrace</title>
+    <link rel="preconnect" href="https://unpkg.com" crossorigin>
+    <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        html, body {
+            margin: 0; padding: 0; width: 100%; height: 100%; height: 100dvh;
+            background: #131722; color: #fff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            overflow: hidden; touch-action: none;
+        }
+        #chart-wrapper { position: relative; width: 100vw; height: 100vh; height: 100dvh; }
+        #chart { width: 100%; height: 100%; }
+        #ob-canvas { position: absolute; top: 0; left: 0; pointer-events: none; z-index: 5; }
+        #top-bar {
+            position: absolute; top: 12px; left: 12px; right: 72px;
+            display: flex; align-items: center; gap: 8px; z-index: 10;
+            font-size: 13px; flex-wrap: wrap; pointer-events: none;
+        }
+        .panel-box {
+            pointer-events: auto; background: rgba(30, 34, 45, 0.92);
+            backdrop-filter: blur(6px); padding: 6px 10px; border-radius: 6px;
+            border: 1px solid #2a2e39; display: flex; gap: 10px;
+            align-items: center; flex-wrap: wrap;
+        }
+        #status { color: #ff5252; font-weight: bold; white-space: nowrap; }
+        #stats-badge { color: #94a3b8; font-size: 12px; white-space: nowrap; }
+        .selector-group {
+            display: flex; align-items: center; gap: 6px;
+            border-right: 1px solid #363c4e; padding-right: 10px;
+        }
+        .tv-select, .tv-btn {
+            background: #2a2e39; color: #d1d4dc; border: 1px solid #363c4e;
+            border-radius: 4px; padding: 5px 8px; font-size: 12px; font-weight: bold;
+            cursor: pointer; outline: none; white-space: nowrap;
+            transition: border-color .2s, background .2s, color .2s;
+        }
+        .tv-select:hover, .tv-btn:hover { border-color: #2962ff; background: #363c4e; }
+        .tv-select.res-select, .tv-btn.active {
+            color: #2962ff; background: rgba(41, 98, 255, .15); border-color: rgba(41, 98, 255, .5);
+        }
+        .tv-btn.wave-btn.active {
+            color: #FFD700; background: rgba(255, 215, 0, .12); border-color: rgba(255, 215, 0, .45);
+        }
+        .tv-select option { background: #1e222d; color: #d1d4dc; }
+        .ohlc-metrics { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .label { color: #787b86; margin-right: 2px; }
+        .value { font-weight: 600; font-variant-numeric: tabular-nums; }
+        .value.green { color: #26a69a; }
+        .value.red { color: #ef5350; }
+        #lbl-candle-time {
+            color: #94a3b8; font-weight: 600; padding-right: 8px;
+            border-right: 1px solid #363c4e; white-space: nowrap;
+        }
+        .timer-box { border-left: 1px solid #363c4e; padding-left: 10px; white-space: nowrap; }
+        #lbl-timer { color: #2962ff; }
+        #ob-info-panel { display: none; font-size: 12px; border-color: rgba(41, 98, 255, .5); }
+        #chart-nav {
+            position: absolute; bottom: 28px; left: 50%;
+            transform: translateX(-50%) translateY(10px);
+            background: rgba(30, 34, 45, .95); border: 1px solid #2a2e39;
+            border-radius: 8px; display: flex; gap: 4px; padding: 4px; z-index: 10;
+            opacity: 0; visibility: hidden;
+            transition: opacity .25s ease, visibility .25s ease, transform .25s ease;
+        }
+        #chart-nav.visible { opacity: 1; visibility: visible; transform: translateX(-50%) translateY(0); }
+        .nav-btn {
+            background: transparent; border: none; color: #d1d4dc;
+            padding: 8px 14px; font-size: 15px; border-radius: 6px; cursor: pointer;
+        }
+        .nav-btn:hover, .nav-btn:active { background: #2a2e39; color: #fff; }
+        @media (max-width: 768px) {
+            #top-bar { top: 6px; left: 6px; right: 6px; gap: 4px; font-size: 11px; }
+            .panel-box { padding: 4px 7px; gap: 6px; width: 100%; justify-content: space-between; }
+            #status-panel { width: auto; flex: 1 1 auto; }
+            .selector-group { border-right: none; padding-right: 0; width: 100%; justify-content: space-between; gap: 4px; }
+            .tv-select, .tv-btn { padding: 4px 6px; font-size: 11px; flex: 1 1 auto; text-align: center; }
+            .ohlc-metrics {
+                width: 100%; justify-content: space-between; gap: 4px; font-size: 11px;
+                border-top: 1px solid #2a2e39; padding-top: 4px;
+            }
+            #lbl-candle-time { padding-right: 4px; font-size: 10px; }
+            .timer-box { padding-left: 6px; }
+            #ob-info-panel { font-size: 11px; padding: 4px 7px; }
+            #chart-nav { bottom: 36px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="top-bar">
+        <div class="panel-box" id="status-panel">
+            <span id="status">● Connecting...</span>
+            <span id="stats-badge"></span>
+        </div>
+        <div class="panel-box" id="ohlc-panel">
+            <div class="selector-group">
+                <select id="symbol-select" class="tv-select" title="Select Symbol">
+                    {% for sym in symbols %}
+                    <option value="{{ sym }}" {% if sym == symbol %}selected{% endif %}>{{ sym }}</option>
+                    {% endfor %}
+                </select>
+                <select id="resolution-select" class="tv-select res-select" title="Select Timeframe">
+                    {% for res in resolutions %}
+                    <option value="{{ res }}" {% if res == resolution %}selected{% endif %}>{{ res }}</option>
+                    {% endfor %}
+                </select>
+                <button id="btn-ob-toggle" class="tv-btn active" title="Show/Hide Order Block Zones">OB: ON (<span id="ob-count">0</span>)</button>
+                <button id="btn-wave-toggle" class="tv-btn wave-btn active" title="Show/Hide Impulse-Retrace Wave">Wave: ON</button>
+            </div>
+            <div class="ohlc-metrics">
+                <div id="lbl-candle-time">--</div>
+                <div><span class="label">O</span><span id="lbl-open" class="value">--</span></div>
+                <div><span class="label">H</span><span id="lbl-high" class="value">--</span></div>
+                <div><span class="label">L</span><span id="lbl-low" class="value">--</span></div>
+                <div><span class="label">C</span><span id="lbl-close" class="value">--</span></div>
+                <div class="timer-box">
+                    <span class="label">⏳</span>
+                    <span id="lbl-timer" class="value">--:--</span>
+                </div>
+            </div>
+        </div>
+        <div class="panel-box" id="ob-info-panel">
+            <span id="ob-info-text"></span>
+        </div>
+    </div>
+    <div id="chart-nav">
+        <button class="nav-btn" id="btn-zoom-out" title="Zoom Out">−</button>
+        <button class="nav-btn" id="btn-zoom-in" title="Zoom In">+</button>
+        <button class="nav-btn" id="btn-scroll-left" title="Scroll Left">&lt;</button>
+        <button class="nav-btn" id="btn-scroll-right" title="Scroll Right">&gt;</button>
+        <button class="nav-btn" id="btn-reset" title="Jump to Live">⟳</button>
+    </div>
+    <div id="chart-wrapper">
+        <div id="chart"></div>
+        <canvas id="ob-canvas"></canvas>
+    </div>
+    <script>
+        "use strict";
+        const GREEN = "#26a69a", RED = "#ef5350";
+        const DARK_GREEN = "#00FFD8", DARK_RED = "#FF0015";
+        const WAVE_GOLD = "#FFD700";
+        const IST = 'Asia/Kolkata';
+        const fmtHeader = new Intl.DateTimeFormat('en-GB', { timeZone: IST, day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
+        const fmtCrosshair = new Intl.DateTimeFormat('en-GB', { timeZone: IST, day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+        const fmtTick = new Intl.DateTimeFormat('en-GB', { timeZone: IST, hour: '2-digit', minute: '2-digit', hour12: false });
+        const isMobile = () => window.innerWidth <= 768;
+        const pad2 = n => n < 10 ? '0' + n : String(n);
+        const isNum = v => v !== null && v !== undefined && !Number.isNaN(Number(v));
+
+        function getResolutionSeconds(resStr) {
+            const raw = String(resStr).trim();
+            if (raw.endsWith('M')) return parseInt(raw, 10) * 30 * 86400;
+            const s = raw.toLowerCase();
+            const n = parseInt(s, 10);
+            if (s.endsWith('m')) return n * 60;
+            if (s.endsWith('h')) return n * 3600;
+            if (s.endsWith('d')) return n * 86400;
+            if (s.endsWith('w')) return n * 604800;
+            if (s.endsWith('s')) return n;
+            return 900;
+        }
+
+        function dedupeSort(items, keyFn, valid) {
+            if (!items || !items.length) return [];
+            let alreadySorted = true, prevK = -Infinity;
+            for (let i = 0; i < items.length; i++) {
+                const it = items[i];
+                if (!valid(it)) { alreadySorted = false; break; }
+                const k = keyFn(it);
+                if (k <= prevK) { alreadySorted = false; break; }
+                prevK = k;
+            }
+            if (alreadySorted) return items;
+            const map = new Map();
+            for (const it of items) if (valid(it)) map.set(keyFn(it), it);
+            return Array.from(map.values()).sort((a, b) => keyFn(a) - keyFn(b));
+        }
+
+        function prepOb(ob) {
+            ob._start = Number(ob.time);
+            ob._end = ob.breakout_breakdown_candle > 0 ? Number(ob.breakout_breakdown_candle) : 0;
+            ob._high = Number(ob.high);
+            ob._low = Number(ob.low);
+            ob._bull = Number(ob.setup_trend) === 1;
+            ob._hasEdge = isNum(ob.price_edge);
+            ob._edge = ob._hasEdge ? Number(ob.price_edge) : 0;
+            return ob;
+        }
+
+        window.onload = function () {
+            const $ = id => document.getElementById(id);
+            const chartElement = $('chart'), obCanvas = $('ob-canvas'), ctx = obCanvas.getContext('2d');
+            const statusEl = $('status'), statsBadge = $('stats-badge'), navToolbar = $('chart-nav');
+            const symbolSelect = $('symbol-select'), resolutionSelect = $('resolution-select');
+            const btnObToggle = $('btn-ob-toggle'), btnWaveToggle = $('btn-wave-toggle');
+            const obInfoPanel = $('ob-info-panel'), obInfoText = $('ob-info-text');
+            const lblCandleTime = $('lbl-candle-time'), lblOpen = $('lbl-open'), lblHigh = $('lbl-high'), lblLow = $('lbl-low'), lblClose = $('lbl-close'), lblTimer = $('lbl-timer');
+
+            let activeSymbol = symbolSelect.value, activeResolution = resolutionSelect.value;
+            let activeIntervalSec = getResolutionSeconds(activeResolution);
+            let eventSource = null, loadAbort = null, overlayAbort = null, overlayTimer = null, currentLoadId = 0;
+            let candlesByTime = new Map(), timeToIndexMap = new Map(), orderBlocks = [], obByTimestamp = new Map(), impulsePoints = [];
+            let showObZones = true, showWave = true, latestCandle = null, isHoveringCandle = false, drawPending = false, lastFormattedTimeTs = -1;
+            let cssW = 0, cssH = 0;
+
+            const chart = LightweightCharts.createChart(chartElement, {
+                width: chartElement.clientWidth, height: chartElement.clientHeight,
+                layout: { background: { type: 'solid', color: '#131722' }, textColor: '#d1d4dc', fontSize: isMobile() ? 10 : 12 },
+                grid: { vertLines: { color: '#1e222d' }, horzLines: { color: '#1e222d' } },
+                crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+                handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: true },
+                handleScale: { axisPressedMouseMove: true, mouseWheel: true, pinch: true },
+                localization: { timeFormatter: t => fmtCrosshair.format(new Date(t * 1000)) + " IST" },
+                timeScale: { timeVisible: true, secondsVisible: false, rightOffset: isMobile() ? 4 : 8, tickMarkFormatter: t => fmtTick.format(new Date(t * 1000)) }
+            });
+
+            const candleSeries = chart.addCandlestickSeries({ upColor: GREEN, downColor: RED, borderVisible: false, wickUpColor: GREEN, wickDownColor: RED });
+            const impulseRetraceSeries = chart.addLineSeries({ color: WAVE_GOLD, lineWidth: 2, lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false, title: "Impulse-Retrace", autoscaleInfoProvider: () => null });
+            const timeScale = chart.timeScale();
+
+            function confirmedFiveCandleResolutions(c) {
+                const out = [];
+                if (isNum(c?.five_candle_movement_1m)) out.push("1m");
+                if (isNum(c?.five_candle_movement_3m)) out.push("3m");
+                if (isNum(c?.five_candle_movement_5m)) out.push("5m");
+                return out;
+            }
+
+            function toSeriesCandle(c) {
+                const bar = { time: Number(c.time), open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close) };
+                if (Number(c.candidate) === 1) {
+                    const hl = c.setup_trend === 1 ? DARK_GREEN : DARK_RED;
+                    bar.color = hl; bar.borderColor = hl; bar.wickColor = hl;
+                }
+                return bar;
+            }
+
+            function getXCoordForTime(ts) {
+                const x = timeScale.timeToCoordinate(ts);
+                if (x !== null) return x;
+                const idx = timeToIndexMap.get(ts);
+                return idx !== undefined ? timeScale.logicalToCoordinate(idx) : null;
+            }
+
+            function scheduleDraw() {
+                if (drawPending) return;
+                drawPending = true;
+                requestAnimationFrame(() => { drawPending = false; drawOrderBlocks(); });
+            }
+
+            function resizeCanvas() {
+                const dpr = window.devicePixelRatio || 1;
+                cssW = chartElement.clientWidth; cssH = chartElement.clientHeight;
+                obCanvas.width = Math.round(cssW * dpr); obCanvas.height = Math.round(cssH * dpr);
+                obCanvas.style.width = cssW + 'px'; obCanvas.style.height = cssH + 'px';
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                drawOrderBlocks();
+            }
+
+            function drawOrderBlocks() {
+                ctx.clearRect(0, 0, cssW, cssH);
+                if (!showObZones || !orderBlocks.length) return;
+                const chartWidth = cssW - (isMobile() ? 54 : 65);
+                const vis = timeScale.getVisibleRange();
+                const visFrom = vis ? Number(vis.from) : -Infinity, visTo = vis ? Number(vis.to) : Infinity;
+                const lastTime = latestCandle ? Number(latestCandle.time) : 0;
+                const bullEdges = [], bearEdges = [];
+                ctx.setLineDash([]); ctx.lineWidth = 1.25;
+
+                for (let i = 0; i < orderBlocks.length; i++) {
+                    const ob = orderBlocks[i], startTime = ob._start;
+                    if (startTime > visTo) break;
+                    const endTime = ob._end > 0 ? ob._end : (lastTime || startTime);
+                    if (endTime < visFrom) continue;
+                    const x1 = getXCoordForTime(startTime), x2 = getXCoordForTime(endTime);
+                    if (x1 === null || x2 === null) continue;
+                    const yTop = candleSeries.priceToCoordinate(ob._high), yBot = candleSeries.priceToCoordinate(ob._low);
+                    if (yTop === null || yBot === null) continue;
+                    const left = Math.max(0, Math.min(x1, x2)), right = Math.min(chartWidth, Math.max(x1, x2, left + 6));
+                    if (right <= left) continue;
+                    const top = Math.min(yTop, yBot), height = Math.max(2, Math.abs(yBot - yTop)), isBull = ob._bull;
+                    ctx.fillStyle = isBull ? 'rgba(38,166,154,0.20)' : 'rgba(239,83,80,0.20)';
+                    ctx.fillRect(left, top, right - left, height);
+                    ctx.strokeStyle = isBull ? 'rgba(38,166,154,0.88)' : 'rgba(239,83,80,0.88)';
+                    ctx.strokeRect(left, top, right - left, height);
+                    if (ob._hasEdge) {
+                        const yEdge = candleSeries.priceToCoordinate(ob._edge);
+                        if (yEdge !== null) {
+                            if (isBull) bullEdges.push(left, right, yEdge);
+                            else bearEdges.push(left, right, yEdge);
+                        }
+                    }
+                }
+
+                if (bullEdges.length || bearEdges.length) {
+                    ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5;
+                    if (bullEdges.length) {
+                        ctx.strokeStyle = '#00e676'; ctx.beginPath();
+                        for (let i = 0; i < bullEdges.length; i += 3) { ctx.moveTo(bullEdges[i], bullEdges[i + 2]); ctx.lineTo(bullEdges[i + 1], bullEdges[i + 2]); }
+                        ctx.stroke();
+                    }
+                    if (bearEdges.length) {
+                        ctx.strokeStyle = '#ff5252'; ctx.beginPath();
+                        for (let i = 0; i < bearEdges.length; i += 3) { ctx.moveTo(bearEdges[i], bearEdges[i + 2]); ctx.lineTo(bearEdges[i + 1], bearEdges[i + 2]); }
+                        ctx.stroke();
+                    }
+                    ctx.setLineDash([]);
+                }
+            }
+
+            timeScale.subscribeVisibleLogicalRangeChange(scheduleDraw);
+            chartElement.addEventListener('pointermove', e => { if (e.buttons) scheduleDraw(); }, { passive: true });
+            chartElement.addEventListener('wheel', scheduleDraw, { passive: true });
+            chartElement.addEventListener('touchmove', scheduleDraw, { passive: true });
+
+            function updateMarkersAndStats() {
+                try {
+                    if (showObZones && orderBlocks.length) {
+                        const markerMap = new Map();
+                        for (const ob of orderBlocks) {
+                            const t = ob._start;
+                            if (!Number.isFinite(t)) continue;
+                            const confs = confirmedFiveCandleResolutions(ob), bull = ob._bull;
+                            markerMap.set(t, { time: t, position: bull ? 'belowBar' : 'aboveBar', color: bull ? '#00e676' : '#ff5252', shape: bull ? 'arrowUp' : 'arrowDown', text: confs.length ? `5C ${confs.join('·')}` : (bull ? 'OB ↑' : 'OB ↓') });
+                        }
+                        candleSeries.setMarkers(Array.from(markerMap.values()).sort((a, b) => a.time - b.time));
+                    } else candleSeries.setMarkers([]);
+                } catch (e) {}
+                const countSpan = $('ob-count');
+                if (countSpan) countSpan.textContent = orderBlocks.length;
+                statsBadge.textContent = `${candlesByTime.size.toLocaleString()} bars · ${orderBlocks.length} OB · ${impulsePoints.length} pivots`;
+                scheduleDraw();
+            }
+
+            function setWave(points) {
+                impulsePoints = dedupeSort((points || []).map(p => ({ time: Number(p.time), value: Number(p.value) })), p => p.time, p => Number.isFinite(p.time) && Number.isFinite(p.value));
+            }
+
+            function applyInitialPayload(payload) {
+                candleSeries.setMarkers([]); ctx.clearRect(0, 0, cssW, cssH);
+                const candles = dedupeSort(payload.candles, c => Number(c.time), c => Number.isFinite(Number(c.time)) && Number.isFinite(Number(c.open)) && Number.isFinite(Number(c.close)));
+                setWave(payload.impulse_retrace);
+                candlesByTime = new Map(); timeToIndexMap = new Map(); obByTimestamp = new Map(); orderBlocks = [];
+                const seriesData = new Array(candles.length);
+                for (let i = 0; i < candles.length; i++) {
+                    const c = candles[i], t = Number(c.time);
+                    candlesByTime.set(t, c); timeToIndexMap.set(t, i);
+                    if (Number(c.candidate) === 1) { prepOb(c); orderBlocks.push(c); obByTimestamp.set(t, c); }
+                    seriesData[i] = toSeriesCandle(c);
+                }
+                candleSeries.setData(seriesData);
+                impulseRetraceSeries.setData(showWave ? impulsePoints : []);
+                updateMarkersAndStats();
+                if (candles.length) {
+                    chart.priceScale('right').applyOptions({ autoScale: true });
+                    timeScale.fitContent();
+                    latestCandle = candles[candles.length - 1];
+                    lastFormattedTimeTs = -1;
+                    updateOhlcPanel(latestCandle);
+                } else latestCandle = null;
+            }
+
+            function refreshOverlaysInBackground(sym, res) {
+                if (overlayAbort) overlayAbort.abort();
+                overlayAbort = new AbortController();
+                const query = `symbol=${encodeURIComponent(sym)}&resolution=${encodeURIComponent(res)}`;
+                fetch(`/api/ob_data?${query}`, { signal: overlayAbort.signal })
+                    .then(r => r.ok ? r.json() : null)
+                    .then(payload => {
+                        if (!payload || sym !== activeSymbol || res !== activeResolution) return;
+                        if (Array.isArray(payload.order_blocks)) {
+                            orderBlocks = payload.order_blocks.map(prepOb);
+                            obByTimestamp = new Map();
+                            for (const ob of orderBlocks) {
+                                const t = ob._start;
+                                obByTimestamp.set(t, ob);
+                                const existing = candlesByTime.get(t);
+                                if (existing) candlesByTime.set(t, Object.assign(existing, ob));
+                            }
+                        }
+                        if (Array.isArray(payload.impulse_retrace) && payload.impulse_retrace.length) {
+                            setWave(payload.impulse_retrace);
+                            if (showWave) impulseRetraceSeries.setData(impulsePoints);
+                        }
+                        updateMarkersAndStats();
+                    }).catch(() => {});
+            }
+
+            function updateOhlcPanel(c, timeOverride = null) {
+                if (!c) return;
+                const ts = timeOverride !== null ? Number(timeOverride) : Number(c.time);
+                if (ts && ts !== lastFormattedTimeTs) {
+                    lastFormattedTimeTs = ts;
+                    lblCandleTime.textContent = fmtHeader.format(new Date(ts * 1000));
+                }
+                lblOpen.textContent = Number(c.open).toFixed(2);
+                lblHigh.textContent = Number(c.high).toFixed(2);
+                lblLow.textContent = Number(c.low).toFixed(2);
+                lblClose.textContent = Number(c.close).toFixed(2);
+                lblClose.className = "value " + (c.close >= c.open ? "green" : "red");
+            }
+
+            function updateCountdown() {
+                const interval = activeIntervalSec, now = Math.floor(Date.now() / 1000), left = interval - (now % interval);
+                const d = Math.floor(left / 86400), h = Math.floor((left % 86400) / 3600), m = Math.floor((left % 3600) / 60), s = left % 60;
+                lblTimer.textContent = d > 0 ? `${d}d ${pad2(h)}h ${pad2(m)}m` : h > 0 ? `${pad2(h)}:${pad2(m)}:${pad2(s)}` : `${pad2(m)}:${pad2(s)}`;
+            }
+            updateCountdown();
+            let countdownTimer = setInterval(updateCountdown, 1000);
+
+            function shiftRange(zoomFactor, shiftFactor) {
+                const r = timeScale.getVisibleLogicalRange();
+                if (!r) return;
+                const span = r.to - r.from, m = span * zoomFactor, s = span * shiftFactor;
+                timeScale.setVisibleLogicalRange({ from: r.from + m + s, to: r.to - m + s });
+            }
+            $('btn-zoom-in').addEventListener('click', () => shiftRange(0.15, 0));
+            $('btn-zoom-out').addEventListener('click', () => shiftRange(-0.15, 0));
+            $('btn-scroll-left').addEventListener('click', () => shiftRange(0, -0.3));
+            $('btn-scroll-right').addEventListener('click', () => shiftRange(0, 0.3));
+            $('btn-reset').addEventListener('click', () => { chart.priceScale('right').applyOptions({ autoScale: true }); timeScale.scrollToRealTime(); scheduleDraw(); });
+
+            btnObToggle.addEventListener('click', () => {
+                showObZones = !showObZones;
+                btnObToggle.innerHTML = `OB: ${showObZones ? 'ON' : 'OFF'} (<span id="ob-count">${orderBlocks.length}</span>)`;
+                btnObToggle.classList.toggle('active', showObZones);
+                updateMarkersAndStats();
+            });
+            btnWaveToggle.addEventListener('click', () => {
+                showWave = !showWave;
+                btnWaveToggle.textContent = `Wave: ${showWave ? 'ON' : 'OFF'}`;
+                btnWaveToggle.classList.toggle('active', showWave);
+                impulseRetraceSeries.setData(showWave ? impulsePoints : []);
+            });
+
+            chart.subscribeCrosshairMove(param => {
+                const bar = param.time && param.seriesData ? param.seriesData.get(candleSeries) : null;
+                if (!bar) { isHoveringCandle = false; if (latestCandle) updateOhlcPanel(latestCandle); obInfoPanel.style.display = 'none'; return; }
+                isHoveringCandle = true;
+                const t = Number(param.time);
+                updateOhlcPanel(bar, t);
+                const ob = obByTimestamp.get(t);
+                if (!ob) { obInfoPanel.style.display = 'none'; return; }
+                const bull = ob._bull, f = (v, d = 2) => isNum(v) ? Number(v).toFixed(d) : "-";
+                obInfoText.innerHTML = `<b style="color:${bull ? '#00e676' : '#ff5252'}">${bull ? "BULL OB ↑" : "BEAR OB ↓"}</b> | Edge: <b>${f(ob.price_edge)}</b> | Move: <b>${f(ob.setup_movement)}</b> | 5C: <b>${f(ob.five_candle_movement_1m, 1)}/${f(ob.five_candle_movement_3m, 1)}/${f(ob.five_candle_movement_5m, 1)}</b>`;
+                obInfoPanel.style.display = 'flex';
+            });
+
+            function setStatus(text, color) { statusEl.textContent = text; statusEl.style.color = color; }
+            function closeStreams() { if (eventSource) { eventSource.close(); eventSource = null; } if (loadAbort) loadAbort.abort(); if (overlayAbort) overlayAbort.abort(); clearTimeout(overlayTimer); }
+
+            function onLiveMessage(event, requestId) {
+                if (requestId !== currentLoadId || !event.data || event.data.charCodeAt(0) === 58) return;
+                let incoming; try { incoming = JSON.parse(event.data); } catch { return; }
+                const incTime = Number(incoming.time);
+                if (!Number.isFinite(incTime)) return;
+                incoming.time = incTime;
+                const lastT = latestCandle ? Number(latestCandle.time) : null;
+                if (lastT !== null && incTime < lastT) return;
+                const isNewBar = lastT !== null && incTime > lastT;
+                let targetBar = candlesByTime.get(incTime);
+                if (targetBar) {
+                    targetBar.open = Number(incoming.open); targetBar.close = Number(incoming.close);
+                    targetBar.high = Math.max(Number(targetBar.high), Number(incoming.high), targetBar.close);
+                    targetBar.low = Math.min(Number(targetBar.low), Number(incoming.low), targetBar.close);
+                } else {
+                    targetBar = incoming; candlesByTime.set(incTime, targetBar); timeToIndexMap.set(incTime, timeToIndexMap.size);
+                }
+                candleSeries.update(toSeriesCandle(targetBar));
+                latestCandle = targetBar;
+                if (!isHoveringCandle) updateOhlcPanel(targetBar);
+                if (isNewBar) { scheduleDraw(); clearTimeout(overlayTimer); overlayTimer = setTimeout(() => refreshOverlaysInBackground(activeSymbol, activeResolution), 1200); }
+            }
+
+            function loadChartAndStream(sym, res) {
+                const requestId = ++currentLoadId;
+                activeSymbol = sym; activeResolution = res; activeIntervalSec = getResolutionSeconds(res);
+                updateCountdown(); closeStreams();
+                loadAbort = new AbortController();
+                setStatus("● Loading...", "#ffb300");
+                const query = `symbol=${encodeURIComponent(sym)}&resolution=${encodeURIComponent(res)}`;
+                fetch(`/api/ob_data?${query}`, { signal: loadAbort.signal, cache: "no-store" })
+                    .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+                    .then(payload => {
+                        if (requestId !== currentLoadId) return;
+                        applyInitialPayload(payload);
+                        setStatus("● Live", "#00e676");
+                        eventSource = new EventSource(`/api/stream?${query}`);
+                        eventSource.onopen = () => { if (requestId === currentLoadId) setStatus("● Live", "#00e676"); };
+                        eventSource.onerror = () => { if (requestId === currentLoadId) setStatus("● Reconnecting...", "#ffb300"); };
+                        eventSource.onmessage = ev => onLiveMessage(ev, requestId);
+                    })
+                    .catch(err => {
+                        if (err.name === 'AbortError' || requestId !== currentLoadId) return;
+                        setStatus("● Error", "#ff5252");
+                    });
+            }
+
+            const reload = () => loadChartAndStream(symbolSelect.value, resolutionSelect.value);
+            symbolSelect.addEventListener('change', reload);
+            resolutionSelect.addEventListener('change', reload);
+
+            let resizeRaf = 0;
+            new ResizeObserver(() => {
+                cancelAnimationFrame(resizeRaf);
+                resizeRaf = requestAnimationFrame(() => {
+                    chart.applyOptions({ width: chartElement.clientWidth, height: chartElement.clientHeight, layout: { fontSize: isMobile() ? 10 : 12 }, timeScale: { rightOffset: isMobile() ? 4 : 8 } });
+                    resizeCanvas();
+                });
+            }).observe(chartElement);
+
+            window.addEventListener('pagehide', closeStreams);
+            resizeCanvas();
+            loadChartAndStream(activeSymbol, activeResolution);
+        };
+    </script>
+</body>
+</html>
