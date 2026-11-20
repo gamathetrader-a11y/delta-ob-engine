@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#131722">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
-    <title>Delta Exchange India Live Chart — Order Block & Impulse-Retrace</title>
+    <title>Delta Exchange India Live Chart — OB Setup, OB & Impulse-Retrace</title>
     <link rel="preconnect" href="https://unpkg.com" crossorigin>
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
@@ -37,15 +37,28 @@
             display: flex; align-items: center; gap: 6px;
             border-right: 1px solid #363c4e; padding-right: 10px;
         }
+        .btn-group { display: inline-flex; align-items: stretch; }
+        .btn-group .tv-btn:first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; border-right: none; }
+        .btn-group .tv-btn:last-child { border-top-left-radius: 0; border-bottom-left-radius: 0; }
         .tv-select, .tv-btn {
-            background: #2a2e39; color: #d1d4dc; border: 1px solid #363c4e;
+            background: #2a2e39; color: #94a3b8; border: 1px solid #363c4e;
             border-radius: 4px; padding: 5px 8px; font-size: 12px; font-weight: bold;
             cursor: pointer; outline: none; white-space: nowrap;
-            transition: border-color .2s, background .2s, color .2s;
+            display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+            transition: border-color .2s, background .2s, color .2s, opacity .2s;
         }
-        .tv-select:hover, .tv-btn:hover { border-color: #2962ff; background: #363c4e; }
+        .tv-btn:not(.active) { opacity: 0.65; }
+        .tv-select { color: #d1d4dc; }
+        .tv-select:hover, .tv-btn:hover { border-color: #2962ff; background: #363c4e; opacity: 1; }
         .tv-select.res-select, .tv-btn.active {
-            color: #2962ff; background: rgba(41, 98, 255, .15); border-color: rgba(41, 98, 255, .5);
+            color: #2962ff; background: rgba(41, 98, 255, .15); border-color: rgba(41, 98, 255, .5); opacity: 1;
+        }
+        .tv-btn.simple-ob-btn.active {
+            color: #38bdf8; background: rgba(56, 189, 248, .14); border-color: rgba(56, 189, 248, .5);
+        }
+        .tv-btn.settings-btn { padding: 5px 7px; color: #cbd5e1; opacity: 1; }
+        .tv-btn.settings-btn.has-filter {
+            color: #38bdf8; border-color: rgba(56, 189, 248, .65); background: rgba(56, 189, 248, .18);
         }
         .tv-btn.wave-btn.active {
             color: #FFD700; background: rgba(255, 215, 0, .12); border-color: rgba(255, 215, 0, .45);
@@ -63,6 +76,37 @@
         .timer-box { border-left: 1px solid #363c4e; padding-left: 10px; white-space: nowrap; }
         #lbl-timer { color: #2962ff; }
         #ob-info-panel { display: none; font-size: 12px; border-color: rgba(41, 98, 255, .5); }
+
+        #ob-settings-popover {
+            display: none; position: absolute; top: 96px; left: 12px; z-index: 30;
+            background: rgba(24, 28, 38, 0.98); border: 1px solid #363c4e;
+            border-radius: 8px; padding: 12px; width: 270px;
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55); font-size: 12px;
+        }
+        #ob-settings-popover.open { display: block; }
+        .settings-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid #2a2e39;
+            font-weight: 700; color: #38bdf8;
+        }
+        .settings-close {
+            background: transparent; border: none; color: #94a3b8;
+            font-size: 16px; cursor: pointer; padding: 0 4px; line-height: 1;
+        }
+        .settings-close:hover { color: #fff; }
+        .settings-row { margin-bottom: 8px; }
+        .settings-row-label { display: block; color: #cbd5e1; font-size: 11px; font-weight: 600; margin-bottom: 4px; }
+        .settings-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+        .settings-pair input {
+            background: #131722; color: #fff; border: 1px solid #363c4e;
+            border-radius: 4px; padding: 5px 7px; font-size: 11.5px; outline: none; width: 100%;
+        }
+        .settings-pair input:focus { border-color: #38bdf8; }
+        .settings-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 10px; }
+        .settings-actions button { padding: 5px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; cursor: pointer; }
+        #btn-ob-reset-filter { background: #2a2e39; color: #cbd5e1; border: 1px solid #363c4e; }
+        #btn-ob-apply-filter { background: #2962ff; color: #fff; border: 1px solid #2962ff; }
+
         #chart-nav {
             position: absolute; bottom: 28px; left: 50%;
             transform: translateX(-50%) translateY(10px);
@@ -81,8 +125,9 @@
             #top-bar { top: 6px; left: 6px; right: 6px; gap: 4px; font-size: 11px; }
             .panel-box { padding: 4px 7px; gap: 6px; width: 100%; justify-content: space-between; }
             #status-panel { width: auto; flex: 1 1 auto; }
-            .selector-group { border-right: none; padding-right: 0; width: 100%; justify-content: space-between; gap: 4px; }
-            .tv-select, .tv-btn { padding: 4px 6px; font-size: 11px; flex: 1 1 auto; text-align: center; }
+            .selector-group { border-right: none; padding-right: 0; width: 100%; justify-content: space-between; gap: 4px; flex-wrap: wrap; }
+            .tv-select, .tv-btn { padding: 4px 5px; font-size: 10.5px; flex: 1 1 auto; text-align: center; }
+            .btn-group { flex: 1 1 auto; }
             .ohlc-metrics {
                 width: 100%; justify-content: space-between; gap: 4px; font-size: 11px;
                 border-top: 1px solid #2a2e39; padding-top: 4px;
@@ -90,6 +135,7 @@
             #lbl-candle-time { padding-right: 4px; font-size: 10px; }
             .timer-box { padding-left: 6px; }
             #ob-info-panel { font-size: 11px; padding: 4px 7px; }
+            #ob-settings-popover { top: 118px; left: 6px; width: calc(100vw - 12px); max-width: 280px; }
             #chart-nav { bottom: 36px; }
         }
     </style>
@@ -112,8 +158,12 @@
                     <option value="{{ res }}" {% if res == resolution %}selected{% endif %}>{{ res }}</option>
                     {% endfor %}
                 </select>
-                <button id="btn-ob-toggle" class="tv-btn active" title="Show/Hide Order Block Zones">OB: ON (<span id="ob-count">0</span>)</button>
-                <button id="btn-wave-toggle" class="tv-btn wave-btn active" title="Show/Hide Impulse-Retrace Wave">Wave: ON</button>
+                <button id="btn-ob-toggle" class="tv-btn active" title="Show/Hide OB Setup">👁 OB SETUP (<span id="ob-count">0</span>)</button>
+                <div class="btn-group">
+                    <button id="btn-simple-ob-toggle" class="tv-btn simple-ob-btn active" title="Show/Hide OB">👁 OB (<span id="simple-ob-count">0</span>)</button>
+                    <button id="btn-ob-settings" class="tv-btn settings-btn" title="OB Momentum Settings">⚙</button>
+                </div>
+                <button id="btn-wave-toggle" class="tv-btn wave-btn active" title="Show/Hide Wave">👁 Wave</button>
             </div>
             <div class="ohlc-metrics">
                 <div id="lbl-candle-time">--</div>
@@ -131,6 +181,46 @@
             <span id="ob-info-text"></span>
         </div>
     </div>
+
+    <div id="ob-settings-popover">
+        <div class="settings-header">
+            <span>⚙ OB Momentum Filter</span>
+            <button class="settings-close" id="btn-ob-settings-close" title="Close">&times;</button>
+        </div>
+        <div class="settings-row">
+            <span class="settings-row-label">OB Momentum (blank = None)</span>
+            <div class="settings-pair">
+                <input type="number" id="input-min-mom" step="any" placeholder="Min">
+                <input type="number" id="input-max-mom" step="any" placeholder="Max">
+            </div>
+        </div>
+        <div class="settings-row">
+            <span class="settings-row-label">1m 5C Momentum (OR)</span>
+            <div class="settings-pair">
+                <input type="number" id="input-min-1m" step="any" placeholder="Min">
+                <input type="number" id="input-max-1m" step="any" placeholder="Max">
+            </div>
+        </div>
+        <div class="settings-row">
+            <span class="settings-row-label">3m 5C Momentum (OR)</span>
+            <div class="settings-pair">
+                <input type="number" id="input-min-3m" step="any" placeholder="Min">
+                <input type="number" id="input-max-3m" step="any" placeholder="Max">
+            </div>
+        </div>
+        <div class="settings-row">
+            <span class="settings-row-label">5m 5C Momentum (OR)</span>
+            <div class="settings-pair">
+                <input type="number" id="input-min-5m" step="any" placeholder="Min">
+                <input type="number" id="input-max-5m" step="any" placeholder="Max">
+            </div>
+        </div>
+        <div class="settings-actions">
+            <button id="btn-ob-reset-filter" type="button">Reset</button>
+            <button id="btn-ob-apply-filter" type="button">Apply</button>
+        </div>
+    </div>
+
     <div id="chart-nav">
         <button class="nav-btn" id="btn-zoom-out" title="Zoom Out">−</button>
         <button class="nav-btn" id="btn-zoom-in" title="Zoom In">+</button>
@@ -144,22 +234,18 @@
     </div>
     <script>
         "use strict";
-        const GREEN = "#26a69a", RED = "#ef5350";
-        const DARK_GREEN = "#00FFD8", DARK_RED = "#FF0015";
-        const WAVE_GOLD = "#FFD700";
-        const IST = 'Asia/Kolkata';
+        const GREEN = "#26a69a", RED = "#ef5350", WAVE_GOLD = "#FFD700", IST = 'Asia/Kolkata';
         const fmtHeader = new Intl.DateTimeFormat('en-GB', { timeZone: IST, day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
         const fmtCrosshair = new Intl.DateTimeFormat('en-GB', { timeZone: IST, day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
         const fmtTick = new Intl.DateTimeFormat('en-GB', { timeZone: IST, hour: '2-digit', minute: '2-digit', hour12: false });
         const isMobile = () => window.innerWidth <= 768;
         const pad2 = n => n < 10 ? '0' + n : String(n);
-        const isNum = v => v !== null && v !== undefined && !Number.isNaN(Number(v));
+        const isNum = v => v !== null && v !== undefined && v !== '' && !Number.isNaN(Number(v));
 
         function getResolutionSeconds(resStr) {
             const raw = String(resStr).trim();
             if (raw.endsWith('M')) return parseInt(raw, 10) * 30 * 86400;
-            const s = raw.toLowerCase();
-            const n = parseInt(s, 10);
+            const s = raw.toLowerCase(), n = parseInt(s, 10);
             if (s.endsWith('m')) return n * 60;
             if (s.endsWith('h')) return n * 3600;
             if (s.endsWith('d')) return n * 86400;
@@ -170,15 +256,15 @@
 
         function dedupeSort(items, keyFn, valid) {
             if (!items || !items.length) return [];
-            let alreadySorted = true, prevK = -Infinity;
+            let sorted = true, prevK = -Infinity;
             for (let i = 0; i < items.length; i++) {
                 const it = items[i];
-                if (!valid(it)) { alreadySorted = false; break; }
+                if (!valid(it)) { sorted = false; break; }
                 const k = keyFn(it);
-                if (k <= prevK) { alreadySorted = false; break; }
+                if (k <= prevK) { sorted = false; break; }
                 prevK = k;
             }
-            if (alreadySorted) return items;
+            if (sorted) return items;
             const map = new Map();
             for (const it of items) if (valid(it)) map.set(keyFn(it), it);
             return Array.from(map.values()).sort((a, b) => keyFn(a) - keyFn(b));
@@ -195,20 +281,41 @@
             return ob;
         }
 
+        function prepSimpleOb(ob) {
+            ob._start = Number(ob.time);
+            ob._end = ob.end_time > 0 ? Number(ob.end_time) : 0;
+            ob._high = Number(ob.high);
+            ob._low = Number(ob.low);
+            ob._bull = Number(ob.setup_trend) === 1;
+            ob._mom = isNum(ob.momentum) ? Number(ob.momentum) : 0;
+            return ob;
+        }
+
         window.onload = function () {
             const $ = id => document.getElementById(id);
             const chartElement = $('chart'), obCanvas = $('ob-canvas'), ctx = obCanvas.getContext('2d');
             const statusEl = $('status'), statsBadge = $('stats-badge'), navToolbar = $('chart-nav');
             const symbolSelect = $('symbol-select'), resolutionSelect = $('resolution-select');
-            const btnObToggle = $('btn-ob-toggle'), btnWaveToggle = $('btn-wave-toggle');
+            const btnObToggle = $('btn-ob-toggle'), btnSimpleObToggle = $('btn-simple-ob-toggle'), btnWaveToggle = $('btn-wave-toggle');
+            const btnObSettings = $('btn-ob-settings'), obSettingsPopover = $('ob-settings-popover');
+            const inputMinMom = $('input-min-mom'), inputMaxMom = $('input-max-mom');
+            const inputMin1m = $('input-min-1m'), inputMax1m = $('input-max-1m');
+            const inputMin3m = $('input-min-3m'), inputMax3m = $('input-max-3m');
+            const inputMin5m = $('input-min-5m'), inputMax5m = $('input-max-5m');
             const obInfoPanel = $('ob-info-panel'), obInfoText = $('ob-info-text');
             const lblCandleTime = $('lbl-candle-time'), lblOpen = $('lbl-open'), lblHigh = $('lbl-high'), lblLow = $('lbl-low'), lblClose = $('lbl-close'), lblTimer = $('lbl-timer');
+            const countSpan = $('ob-count'), simpleCountSpan = $('simple-ob-count');
 
             let activeSymbol = symbolSelect.value, activeResolution = resolutionSelect.value;
             let activeIntervalSec = getResolutionSeconds(activeResolution);
             let eventSource = null, loadAbort = null, overlayAbort = null, overlayTimer = null, currentLoadId = 0;
-            let candlesByTime = new Map(), timeToIndexMap = new Map(), orderBlocks = [], obByTimestamp = new Map(), impulsePoints = [];
-            let showObZones = true, showWave = true, latestCandle = null, isHoveringCandle = false, drawPending = false, lastFormattedTimeTs = -1;
+            let candlesByTime = new Map(), timeToIndexMap = new Map();
+            let orderBlocks = [], obByTimestamp = new Map();
+            let simpleObs = [], filteredSimpleObs = [], filteredSimpleObByTimestamp = new Map();
+            let impulsePoints = [];
+            let showObZones = true, showSimpleObs = true, showWave = true;
+            const obFilter = { minMom: null, maxMom: null, min1m: null, max1m: null, min3m: null, max3m: null, min5m: null, max5m: null };
+            let latestCandle = null, isHoveringCandle = false, drawPending = false, lastFormattedTimeTs = -1;
             let cssW = 0, cssH = 0;
 
             const chart = LightweightCharts.createChart(chartElement, {
@@ -226,6 +333,36 @@
             const impulseRetraceSeries = chart.addLineSeries({ color: WAVE_GOLD, lineWidth: 2, lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false, title: "Impulse-Retrace", autoscaleInfoProvider: () => null });
             const timeScale = chart.timeScale();
 
+            function passesRange(val, minV, maxV) {
+                if (minV === null && maxV === null) return true;
+                if (!isNum(val)) return false;
+                const mag = Math.abs(Number(val));
+                return (minV === null || mag >= minV) && (maxV === null || mag <= maxV);
+            }
+
+            function rebuildFilteredSimpleObs() {
+                filteredSimpleObs = [];
+                filteredSimpleObByTimestamp = new Map();
+                const has1m = obFilter.min1m !== null || obFilter.max1m !== null;
+                const has3m = obFilter.min3m !== null || obFilter.max3m !== null;
+                const has5m = obFilter.min5m !== null || obFilter.max5m !== null;
+                const any5c = has1m || has3m || has5m;
+
+                for (let i = 0; i < simpleObs.length; i++) {
+                    const sob = simpleObs[i];
+                    if (!passesRange(sob._mom, obFilter.minMom, obFilter.maxMom)) continue;
+                    if (any5c) {
+                        const m1 = has1m && passesRange(sob.five_candle_movement_1m, obFilter.min1m, obFilter.max1m);
+                        const m3 = has3m && passesRange(sob.five_candle_movement_3m, obFilter.min3m, obFilter.max3m);
+                        const m5 = has5m && passesRange(sob.five_candle_movement_5m, obFilter.min5m, obFilter.max5m);
+                        if (!m1 && !m3 && !m5) continue;
+                    }
+                    filteredSimpleObs.push(sob);
+                    filteredSimpleObByTimestamp.set(sob._start, sob);
+                }
+                btnObSettings.classList.toggle('has-filter', Object.values(obFilter).some(v => v !== null));
+            }
+
             function confirmedFiveCandleResolutions(c) {
                 const out = [];
                 if (isNum(c?.five_candle_movement_1m)) out.push("1m");
@@ -235,12 +372,7 @@
             }
 
             function toSeriesCandle(c) {
-                const bar = { time: Number(c.time), open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close) };
-                if (Number(c.candidate) === 1) {
-                    const hl = c.setup_trend === 1 ? DARK_GREEN : DARK_RED;
-                    bar.color = hl; bar.borderColor = hl; bar.wickColor = hl;
-                }
-                return bar;
+                return { time: Number(c.time), open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close) };
             }
 
             function getXCoordForTime(ts) {
@@ -267,13 +399,41 @@
 
             function drawOrderBlocks() {
                 ctx.clearRect(0, 0, cssW, cssH);
-                if (!showObZones || !orderBlocks.length) return;
                 const chartWidth = cssW - (isMobile() ? 54 : 65);
                 const vis = timeScale.getVisibleRange();
                 const visFrom = vis ? Number(vis.from) : -Infinity, visTo = vis ? Number(vis.to) : Infinity;
                 const lastTime = latestCandle ? Number(latestCandle.time) : 0;
-                const bullEdges = [], bearEdges = [];
-                ctx.setLineDash([]); ctx.lineWidth = 1.25;
+
+                // 1. Batched Borderless OB zones (Green = Bull, Red = Bear)
+                if (showSimpleObs && filteredSimpleObs.length) {
+                    const bullBoxes = [], bearBoxes = [];
+                    for (let i = 0; i < filteredSimpleObs.length; i++) {
+                        const ob = filteredSimpleObs[i], startTime = ob._start;
+                        if (startTime > visTo) break;
+                        const endTime = ob._end > 0 ? ob._end : (lastTime || startTime);
+                        if (endTime < visFrom) continue;
+                        const x1 = getXCoordForTime(startTime), x2 = getXCoordForTime(endTime);
+                        if (x1 === null || x2 === null) continue;
+                        const yTop = candleSeries.priceToCoordinate(ob._high), yBot = candleSeries.priceToCoordinate(ob._low);
+                        if (yTop === null || yBot === null) continue;
+                        const left = Math.max(0, Math.min(x1, x2)), right = Math.min(chartWidth, Math.max(x1, x2, left + 6));
+                        if (right <= left) continue;
+                        const top = Math.min(yTop, yBot), height = Math.max(2, Math.abs(yBot - yTop));
+                        (ob._bull ? bullBoxes : bearBoxes).push(left, top, right - left, height);
+                    }
+                    if (bullBoxes.length) {
+                        ctx.fillStyle = 'rgba(38,166,154,0.22)';
+                        for (let i = 0; i < bullBoxes.length; i += 4) ctx.fillRect(bullBoxes[i], bullBoxes[i + 1], bullBoxes[i + 2], bullBoxes[i + 3]);
+                    }
+                    if (bearBoxes.length) {
+                        ctx.fillStyle = 'rgba(239,83,80,0.22)';
+                        for (let i = 0; i < bearBoxes.length; i += 4) ctx.fillRect(bearBoxes[i], bearBoxes[i + 1], bearBoxes[i + 2], bearBoxes[i + 3]);
+                    }
+                }
+
+                // 2. Batched OB SETUP zones (Bordered Green = Bull, Red = Bear + Dashed Edge)
+                if (!showObZones || !orderBlocks.length) return;
+                const sBull = [], sBear = [], bullEdges = [], bearEdges = [];
 
                 for (let i = 0; i < orderBlocks.length; i++) {
                     const ob = orderBlocks[i], startTime = ob._start;
@@ -287,16 +447,26 @@
                     const left = Math.max(0, Math.min(x1, x2)), right = Math.min(chartWidth, Math.max(x1, x2, left + 6));
                     if (right <= left) continue;
                     const top = Math.min(yTop, yBot), height = Math.max(2, Math.abs(yBot - yTop)), isBull = ob._bull;
-                    ctx.fillStyle = isBull ? 'rgba(38,166,154,0.20)' : 'rgba(239,83,80,0.20)';
-                    ctx.fillRect(left, top, right - left, height);
-                    ctx.strokeStyle = isBull ? 'rgba(38,166,154,0.88)' : 'rgba(239,83,80,0.88)';
-                    ctx.strokeRect(left, top, right - left, height);
+                    (isBull ? sBull : sBear).push(left, top, right - left, height);
                     if (ob._hasEdge) {
                         const yEdge = candleSeries.priceToCoordinate(ob._edge);
-                        if (yEdge !== null) {
-                            if (isBull) bullEdges.push(left, right, yEdge);
-                            else bearEdges.push(left, right, yEdge);
-                        }
+                        if (yEdge !== null) (isBull ? bullEdges : bearEdges).push(left, right, yEdge);
+                    }
+                }
+
+                ctx.setLineDash([]); ctx.lineWidth = 1.25;
+                if (sBull.length) {
+                    ctx.fillStyle = 'rgba(38,166,154,0.20)'; ctx.strokeStyle = 'rgba(38,166,154,0.88)';
+                    for (let i = 0; i < sBull.length; i += 4) {
+                        ctx.fillRect(sBull[i], sBull[i + 1], sBull[i + 2], sBull[i + 3]);
+                        ctx.strokeRect(sBull[i], sBull[i + 1], sBull[i + 2], sBull[i + 3]);
+                    }
+                }
+                if (sBear.length) {
+                    ctx.fillStyle = 'rgba(239,83,80,0.20)'; ctx.strokeStyle = 'rgba(239,83,80,0.88)';
+                    for (let i = 0; i < sBear.length; i += 4) {
+                        ctx.fillRect(sBear[i], sBear[i + 1], sBear[i + 2], sBear[i + 3]);
+                        ctx.strokeRect(sBear[i], sBear[i + 1], sBear[i + 2], sBear[i + 3]);
                     }
                 }
 
@@ -322,6 +492,7 @@
             chartElement.addEventListener('touchmove', scheduleDraw, { passive: true });
 
             function updateMarkersAndStats() {
+                rebuildFilteredSimpleObs();
                 try {
                     if (showObZones && orderBlocks.length) {
                         const markerMap = new Map();
@@ -329,14 +500,14 @@
                             const t = ob._start;
                             if (!Number.isFinite(t)) continue;
                             const confs = confirmedFiveCandleResolutions(ob), bull = ob._bull;
-                            markerMap.set(t, { time: t, position: bull ? 'belowBar' : 'aboveBar', color: bull ? '#00e676' : '#ff5252', shape: bull ? 'arrowUp' : 'arrowDown', text: confs.length ? `5C ${confs.join('·')}` : (bull ? 'OB ↑' : 'OB ↓') });
+                            markerMap.set(t, { time: t, position: bull ? 'belowBar' : 'aboveBar', color: bull ? '#00e676' : '#ff5252', shape: bull ? 'arrowUp' : 'arrowDown', text: confs.length ? `5C ${confs.join('·')}` : (bull ? 'OB SETUP ↑' : 'OB SETUP ↓') });
                         }
                         candleSeries.setMarkers(Array.from(markerMap.values()).sort((a, b) => a.time - b.time));
                     } else candleSeries.setMarkers([]);
                 } catch (e) {}
-                const countSpan = $('ob-count');
                 if (countSpan) countSpan.textContent = orderBlocks.length;
-                statsBadge.textContent = `${candlesByTime.size.toLocaleString()} bars · ${orderBlocks.length} OB · ${impulsePoints.length} pivots`;
+                if (simpleCountSpan) simpleCountSpan.textContent = filteredSimpleObs.length;
+                statsBadge.textContent = `${candlesByTime.size.toLocaleString()} bars · ${orderBlocks.length} OB Setup · ${filteredSimpleObs.length} OB · ${impulsePoints.length} pivots`;
                 scheduleDraw();
             }
 
@@ -349,6 +520,8 @@
                 const candles = dedupeSort(payload.candles, c => Number(c.time), c => Number.isFinite(Number(c.time)) && Number.isFinite(Number(c.open)) && Number.isFinite(Number(c.close)));
                 setWave(payload.impulse_retrace);
                 candlesByTime = new Map(); timeToIndexMap = new Map(); obByTimestamp = new Map(); orderBlocks = [];
+                simpleObs = (payload.simple_obs || []).map(prepSimpleOb);
+
                 const seriesData = new Array(candles.length);
                 for (let i = 0; i < candles.length; i++) {
                     const c = candles[i], t = Number(c.time);
@@ -386,6 +559,7 @@
                                 if (existing) candlesByTime.set(t, Object.assign(existing, ob));
                             }
                         }
+                        if (Array.isArray(payload.simple_obs)) simpleObs = payload.simple_obs.map(prepSimpleOb);
                         if (Array.isArray(payload.impulse_retrace) && payload.impulse_retrace.length) {
                             setWave(payload.impulse_retrace);
                             if (showWave) impulseRetraceSeries.setData(impulsePoints);
@@ -414,7 +588,7 @@
                 lblTimer.textContent = d > 0 ? `${d}d ${pad2(h)}h ${pad2(m)}m` : h > 0 ? `${pad2(h)}:${pad2(m)}:${pad2(s)}` : `${pad2(m)}:${pad2(s)}`;
             }
             updateCountdown();
-            let countdownTimer = setInterval(updateCountdown, 1000);
+            setInterval(updateCountdown, 1000);
 
             function shiftRange(zoomFactor, shiftFactor) {
                 const r = timeScale.getVisibleLogicalRange();
@@ -428,17 +602,31 @@
             $('btn-scroll-right').addEventListener('click', () => shiftRange(0, 0.3));
             $('btn-reset').addEventListener('click', () => { chart.priceScale('right').applyOptions({ autoScale: true }); timeScale.scrollToRealTime(); scheduleDraw(); });
 
-            btnObToggle.addEventListener('click', () => {
-                showObZones = !showObZones;
-                btnObToggle.innerHTML = `OB: ${showObZones ? 'ON' : 'OFF'} (<span id="ob-count">${orderBlocks.length}</span>)`;
-                btnObToggle.classList.toggle('active', showObZones);
+            btnObToggle.addEventListener('click', () => { showObZones = !showObZones; btnObToggle.classList.toggle('active', showObZones); updateMarkersAndStats(); });
+            btnSimpleObToggle.addEventListener('click', () => { showSimpleObs = !showSimpleObs; btnSimpleObToggle.classList.toggle('active', showSimpleObs); scheduleDraw(); });
+            btnWaveToggle.addEventListener('click', () => { showWave = !showWave; btnWaveToggle.classList.toggle('active', showWave); impulseRetraceSeries.setData(showWave ? impulsePoints : []); });
+
+            const parseOptNum = el => el.value.trim() === '' ? null : Number(el.value.trim());
+            btnObSettings.addEventListener('click', e => { e.stopPropagation(); obSettingsPopover.classList.toggle('open'); });
+            $('btn-ob-settings-close').addEventListener('click', () => obSettingsPopover.classList.remove('open'));
+            $('btn-ob-apply-filter').addEventListener('click', () => {
+                obFilter.minMom = parseOptNum(inputMinMom); obFilter.maxMom = parseOptNum(inputMaxMom);
+                obFilter.min1m = parseOptNum(inputMin1m); obFilter.max1m = parseOptNum(inputMax1m);
+                obFilter.min3m = parseOptNum(inputMin3m); obFilter.max3m = parseOptNum(inputMax3m);
+                obFilter.min5m = parseOptNum(inputMin5m); obFilter.max5m = parseOptNum(inputMax5m);
                 updateMarkersAndStats();
+                obSettingsPopover.classList.remove('open');
             });
-            btnWaveToggle.addEventListener('click', () => {
-                showWave = !showWave;
-                btnWaveToggle.textContent = `Wave: ${showWave ? 'ON' : 'OFF'}`;
-                btnWaveToggle.classList.toggle('active', showWave);
-                impulseRetraceSeries.setData(showWave ? impulsePoints : []);
+            $('btn-ob-reset-filter').addEventListener('click', () => {
+                [inputMinMom, inputMaxMom, inputMin1m, inputMax1m, inputMin3m, inputMax3m, inputMin5m, inputMax5m].forEach(el => el.value = '');
+                Object.keys(obFilter).forEach(k => obFilter[k] = null);
+                updateMarkersAndStats();
+                obSettingsPopover.classList.remove('open');
+            });
+            document.addEventListener('click', e => {
+                if (obSettingsPopover.classList.contains('open') && !obSettingsPopover.contains(e.target) && e.target !== btnObSettings) {
+                    obSettingsPopover.classList.remove('open');
+                }
             });
 
             chart.subscribeCrosshairMove(param => {
@@ -447,11 +635,20 @@
                 isHoveringCandle = true;
                 const t = Number(param.time);
                 updateOhlcPanel(bar, t);
-                const ob = obByTimestamp.get(t);
-                if (!ob) { obInfoPanel.style.display = 'none'; return; }
-                const bull = ob._bull, f = (v, d = 2) => isNum(v) ? Number(v).toFixed(d) : "-";
-                obInfoText.innerHTML = `<b style="color:${bull ? '#00e676' : '#ff5252'}">${bull ? "BULL OB ↑" : "BEAR OB ↓"}</b> | Edge: <b>${f(ob.price_edge)}</b> | Move: <b>${f(ob.setup_movement)}</b> | 5C: <b>${f(ob.five_candle_movement_1m, 1)}/${f(ob.five_candle_movement_3m, 1)}/${f(ob.five_candle_movement_5m, 1)}</b>`;
-                obInfoPanel.style.display = 'flex';
+                const ob = showObZones ? obByTimestamp.get(t) : null;
+                const sob = showSimpleObs ? filteredSimpleObByTimestamp.get(t) : null;
+                const f = (v, d = 2) => isNum(v) ? Number(v).toFixed(d) : "-";
+                if (ob) {
+                    const bull = ob._bull;
+                    obInfoText.innerHTML = `<b style="color:${bull ? '#00e676' : '#ff5252'}">${bull ? "BULL OB SETUP ↑" : "BEAR OB SETUP ↓"}</b> | Edge: <b>${f(ob.price_edge)}</b> | Move: <b>${f(ob.setup_movement)}</b> | 5C: <b>${f(ob.five_candle_movement_1m, 1)}/${f(ob.five_candle_movement_3m, 1)}/${f(ob.five_candle_movement_5m, 1)}</b>`;
+                    obInfoPanel.style.display = 'flex';
+                } else if (sob) {
+                    const bull = sob._bull;
+                    obInfoText.innerHTML = `<b style="color:${bull ? '#00e676' : '#ff5252'}">${bull ? "BULL OB ↑" : "BEAR OB ↓"}</b> | Mom: <b>${f(sob.momentum)}</b> | Zone: <b>${f(sob.low)}–${f(sob.high)}</b> | 5C: <b>${f(sob.five_candle_movement_1m, 1)}/${f(sob.five_candle_movement_3m, 1)}/${f(sob.five_candle_movement_5m, 1)}</b>`;
+                    obInfoPanel.style.display = 'flex';
+                } else {
+                    obInfoPanel.style.display = 'none';
+                }
             });
 
             function setStatus(text, color) { statusEl.textContent = text; statusEl.style.color = color; }

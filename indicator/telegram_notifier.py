@@ -1,4 +1,4 @@
-"""Standalone Telegram Alert Tracker & Sender for Order Block Engine"""
+"""Standalone Telegram Alert Tracker & Sender for OB Setup & OB Engine"""
 
 import os
 import time
@@ -148,6 +148,15 @@ def _get_alert_conn() -> sqlite3.Connection:
                 PRIMARY KEY (symbol, resolution, candidate_ts)
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS sent_simple_ob_alerts (
+                symbol TEXT,
+                resolution TEXT,
+                candidate_ts INTEGER,
+                sent_at INTEGER,
+                PRIMARY KEY (symbol, resolution, candidate_ts)
+            )
+        """)
         _ALERT_DB_INIT = True
     conn.execute("PRAGMA synchronous=NORMAL;")
     return conn
@@ -206,7 +215,7 @@ def send_startup_welcome_message(symbols: list[str]) -> bool:
     now_ist = datetime.now(tz=KOLKATA_TZ).strftime("%Y-%m-%d %H:%M:%S IST")
 
     msg = (
-        f"✅ <b>DELTA EXCHANGE OB ENGINE CONNECTED</b>\n"
+        f"✅ <b>DELTA EXCHANGE OB &amp; OB SETUP ENGINE CONNECTED</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"🕒 <b>Time:</b> <code>{now_ist}</code>\n"
         f"📊 <b>Alert Symbols:</b> <code>{', '.join(active_syms)}</code>\n"
@@ -226,10 +235,19 @@ def _fmt_num(val) -> str:
     return f"{f:,.2f}" if abs(f) >= 10 else f"{f:,.4f}"
 
 
+def _format_5c_str(row: pd.Series | dict) -> str:
+    confs = []
+    for c_res in ("1m", "3m", "5m"):
+        val = row.get(f"five_candle_movement_{c_res}")
+        if val is not None and pd.notna(val):
+            confs.append(f"{c_res} ({float(val):+.2f})")
+    return ", ".join(confs) if confs else "Confirmed"
+
+
 def format_ob_telegram_alert(row: pd.Series | dict, is_recent_24h: bool = False) -> str:
     is_bull = int(row["setup_trend"]) == 1
-    tag = "⏳ <i>[Last 24h Signal]</i>\n" if is_recent_24h else "⚡ <i>[Live Signal]</i>\n"
-    direction_str = "🟢 <b>BULLISH ORDER BLOCK (UPTREND)</b>" if is_bull else "🔴 <b>BEARISH ORDER BLOCK (DOWNTREND)</b>"
+    tag = "⏳ <i>[Last 24h OB Setup]</i>\n" if is_recent_24h else "⚡ <i>[Live OB Setup]</i>\n"
+    direction_str = "🟢 <b>BULLISH OB SETUP (UPTREND)</b>" if is_bull else "🔴 <b>BEARISH OB SETUP (DOWNTREND)</b>"
 
     sym = row["symbol"]
     res = row["resolution"]
@@ -242,23 +260,35 @@ def format_ob_telegram_alert(row: pd.Series | dict, is_recent_24h: bool = False)
         if bb_ts > 0 else "N/A"
     )
 
-    confs = []
-    for c_res in ("1m", "3m", "5m"):
-        val = row.get(f"five_candle_movement_{c_res}")
-        if val is not None and pd.notna(val):
-            confs.append(f"{c_res} ({float(val):+.2f})")
-    conf_str = ", ".join(confs) if confs else "Confirmed"
-
     return (
         f"{tag}{direction_str}\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"📌 <b>Symbol:</b> <code>{sym}</code> | <b>TF:</b> <code>{res}</code>\n"
-        f"🕒 <b>OB Candle (IST):</b> <code>{ob_time}</code>\n"
+        f"🕒 <b>OB Setup Candle (IST):</b> <code>{ob_time}</code>\n"
         f"⚡ <b>BO/BD Confirmed:</b> <code>{bb_time}</code>\n"
-        f"📊 <b>OB Zone:</b> <code>{_fmt_num(row.get('low'))}</code> – <code>{_fmt_num(row.get('high'))}</code>\n"
+        f"📊 <b>OB Setup Zone:</b> <code>{_fmt_num(row.get('low'))}</code> – <code>{_fmt_num(row.get('high'))}</code>\n"
         f"🎯 <b>Price Edge:</b> <code>{_fmt_num(row.get('price_edge'))}</code>\n"
         f"📏 <b>Setup Move:</b> <code>{_fmt_num(row.get('setup_movement'))}</code>\n"
-        f"🔥 <b>5C Streak:</b> <code>{conf_str}</code>"
+        f"🔥 <b>5C Streak:</b> <code>{_format_5c_str(row)}</code>"
+    )
+
+
+def format_simple_ob_telegram_alert(row: dict, symbol: str, resolution: str, is_recent_24h: bool = False) -> str:
+    is_bull = int(row["setup_trend"]) == 1
+    tag = "⏳ <i>[Last 24h OB]</i>\n" if is_recent_24h else "⚡ <i>[Live OB Created]</i>\n"
+    direction_str = "🟢 <b>BULLISH OB (UPTREND)</b>" if is_bull else "🔴 <b>BEARISH OB (DOWNTREND)</b>"
+
+    c_ts = int(row["time"])
+    ob_time = row.get("datetime_kolkata") or datetime.fromtimestamp(c_ts, tz=KOLKATA_TZ).strftime("%Y-%m-%d %H:%M:%S")
+
+    return (
+        f"{tag}{direction_str}\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"📌 <b>Symbol:</b> <code>{symbol}</code> | <b>TF:</b> <code>{resolution}</code>\n"
+        f"🕒 <b>OB Candle (IST):</b> <code>{ob_time}</code>\n"
+        f"📊 <b>OB Zone:</b> <code>{_fmt_num(row.get('low'))}</code> – <code>{_fmt_num(row.get('high'))}</code>\n"
+        f"📏 <b>Momentum:</b> <code>{_fmt_num(row.get('momentum'))}</code>\n"
+        f"🔥 <b>5C Streak:</b> <code>{_format_5c_str(row)}</code>"
     )
 
 
@@ -282,10 +312,7 @@ def process_ob_alerts(confirmed_input, symbol: str, resolution: str, send_live: 
 
     allowed_syms = cfg["TELEGRAM_ALERT_SYMBOLS"]
     allowed_res = cfg["TELEGRAM_ALERT_RESOLUTIONS"]
-
-    is_allowed_sym = (not allowed_syms) or (clean_sym in allowed_syms)
-    is_allowed_tf = (not allowed_res) or (resolution in allowed_res)
-    should_notify = is_allowed_sym and is_allowed_tf
+    should_notify = ((not allowed_syms) or (clean_sym in allowed_syms)) and ((not allowed_res) or (resolution in allowed_res))
 
     lookback_seconds = int(cfg["TELEGRAM_STARTUP_LOOKBACK_HOURS"] * 3600)
     now_ts = int(time.time())
@@ -327,5 +354,56 @@ def process_ob_alerts(confirmed_input, symbol: str, resolution: str, send_live: 
 
     for msg in new_alerts_to_send:
         if send_telegram_message(msg):
-            print(f"[Telegram Alert Sent] {clean_sym} | {resolution}")
+            print(f"[Telegram OB Setup Alert Sent] {clean_sym} | {resolution}")
+            time.sleep(0.25)
+
+
+def process_simple_ob_alerts(simple_obs: list[dict], symbol: str, resolution: str, send_live: bool = False) -> None:
+    if not simple_obs:
+        return
+
+    cfg = load_telegram_env()
+    clean_sym = str(symbol).replace(".", "_").replace("-", "_").upper()
+
+    allowed_syms = cfg["TELEGRAM_ALERT_SYMBOLS"]
+    allowed_res = cfg["TELEGRAM_ALERT_RESOLUTIONS"]
+    should_notify = ((not allowed_syms) or (clean_sym in allowed_syms)) and ((not allowed_res) or (resolution in allowed_res))
+
+    lookback_seconds = int(cfg["TELEGRAM_STARTUP_LOOKBACK_HOURS"] * 3600)
+    now_ts = int(time.time())
+    cutoff_ts = now_ts - lookback_seconds
+    new_alerts_to_send = []
+
+    with _ALERT_LOCK:
+        conn = _get_alert_conn()
+        try:
+            existing_rows = conn.execute(
+                "SELECT candidate_ts FROM sent_simple_ob_alerts WHERE symbol = ? AND resolution = ?",
+                (clean_sym, resolution),
+            ).fetchall()
+            seen_ts = {int(r[0]) for r in existing_rows}
+
+            to_insert = []
+            for row in simple_obs:
+                c_ts = int(row["time"])
+                if c_ts not in seen_ts:
+                    to_insert.append((clean_sym, resolution, c_ts, now_ts))
+                    if should_notify:
+                        if send_live:
+                            new_alerts_to_send.append(format_simple_ob_telegram_alert(row, clean_sym, resolution, is_recent_24h=False))
+                        elif c_ts >= cutoff_ts:
+                            new_alerts_to_send.append(format_simple_ob_telegram_alert(row, clean_sym, resolution, is_recent_24h=True))
+
+            if to_insert:
+                with conn:
+                    conn.executemany(
+                        "INSERT OR IGNORE INTO sent_simple_ob_alerts (symbol, resolution, candidate_ts, sent_at) VALUES (?, ?, ?, ?)",
+                        to_insert,
+                    )
+        finally:
+            conn.close()
+
+    for msg in new_alerts_to_send:
+        if send_telegram_message(msg):
+            print(f"[Telegram OB Alert Sent] {clean_sym} | {resolution}")
             time.sleep(0.25)

@@ -1,7 +1,6 @@
-"""Pure-RAM Ultra-Fast Vectorized Order Block (Stages 1-10) & R7 Impulse-Retrace Engine
-- Computes all 10 OB stages and R7 wave turning points 100% in RAM using NumPy.
-- Eliminates 51 SQLite indicator table writes per symbol (zero IND_<SYMBOL>.db disk wear).
-- Keeps pre-serialized chart payloads cached in RAM for instant (<1ms) /api/ob_data responses.
+"""Pure-RAM Ultra-Fast Vectorized OB Setup (Stages 1-10), Pre-Retracement OB, & R7 Impulse-Retrace Engine
+- Computes OB SETUP (full 10 stages) and OB (candidate + one-side move + 5C before retracement) in RAM.
+- Triggers both OB SETUP and OB Telegram notifications on startup backfill and live bars.
 """
 
 import re
@@ -24,7 +23,11 @@ if str(INDICATOR_DIR) not in sys.path:
 
 from config import SYMBOLS, UI_RESOLUTIONS, RESAMPLE_SOURCE_MAP
 from database import get_all_candles, get_all_candles_arrays, get_db_path
-from telegram_notifier import process_ob_alerts, send_startup_welcome_message
+from telegram_notifier import (
+    process_ob_alerts,
+    process_simple_ob_alerts,
+    send_startup_welcome_message,
+)
 
 IST_OFFSET_SECONDS = 19800  # +05:30 fixed offset (Asia/Kolkata)
 SYMBOL_LIST = SYMBOLS if isinstance(SYMBOLS, (list, tuple)) else [SYMBOLS]
@@ -36,16 +39,16 @@ for custom_r, base_r in RESAMPLE_SOURCE_MAP.items():
 
 _SYMBOL_LOCKS = {str(s).replace(".", "_").replace("-", "_").upper(): threading.Lock() for s in SYMBOL_LIST}
 _RAM_OVERLAY_CACHE = {}
+_RES_RE = re.compile(r"(\d+)([mhdw])")
+_RES_MULT = {"m": 60, "h": 3600, "d": 86400, "w": 604800}
 
 
 def res_to_seconds(res: str) -> int:
     s = str(res).strip()
     if s.endswith("M"):
         return int(s[:-1]) * 30 * 86400
-    m = re.fullmatch(r"(\d+)([mhdw])", s.lower())
-    if not m:
-        return 900
-    return int(m.group(1)) * {"m": 60, "h": 3600, "d": 86400, "w": 604800}[m.group(2)]
+    m = _RES_RE.fullmatch(s.lower())
+    return int(m.group(1)) * _RES_MULT[m.group(2)] if m else 900
 
 
 def format_kolkata_timestamps(ts_arr: np.ndarray) -> np.ndarray:
@@ -171,11 +174,11 @@ def exact_five_movement_np(ts_arr, open_arr, high_arr, low_arr, close_arr, start
     return (win_h - win_l) if req_colour == 1 else (win_l - win_h)
 
 
-def compute_ram_overlays(candle_arrays: tuple, symbol: str, resolution: str, mtf_cache: dict) -> tuple[dict, dict, list[dict]]:
+def compute_ram_overlays(candle_arrays: tuple, symbol: str, resolution: str, mtf_cache: dict) -> tuple[dict, list[dict], dict, list[dict]]:
     ts, o, h, l, c, v = candle_arrays
     n = len(ts)
     if n == 0:
-        return {}, {}, []
+        return {}, [], {}, []
 
     interval = res_to_seconds(resolution)
     ir_idx_map = detect_r7_states_np(h, l)
@@ -230,13 +233,16 @@ def compute_ram_overlays(candle_arrays: tuple, symbol: str, resolution: str, mtf
     else:
         ch_cand[:] = 0
 
+    prelim_indices = np.flatnonzero(ch_cand == 1)
+
     ch_near = np.zeros(m, dtype="int64")
     ch_edge = np.full(m, np.nan, dtype="float64")
     ch_bb_raw = np.zeros(m, dtype="int64")
     ch_bb_chart = np.zeros(m, dtype="int64")
     ch_end_ts = ch_ts + ch_cnt * interval
 
-    for k in np.flatnonzero(ch_cand == 1):
+    # Evaluate OB SETUP (Stages 1-10)
+    for k in prelim_indices:
         start_k = k + 2
         if start_k >= m:
             ch_cand[k] = 0
@@ -257,6 +263,7 @@ def compute_ram_overlays(candle_arrays: tuple, symbol: str, resolution: str, mtf
                     ch_cand[k] = 0
                     continue
                 t_pos = w1 + int(np.argmax(s2))
+            ch_near[k] = int(ch_ts[t_pos])
             if ch_c[t_pos] < ob_l:
                 ch_cand[k] = 0
                 continue
@@ -270,12 +277,10 @@ def compute_ram_overlays(candle_arrays: tuple, symbol: str, resolution: str, mtf
                     ch_cand[k] = 0
                     continue
                 t_pos = w1 + int(np.argmax(s2))
+            ch_near[k] = int(ch_ts[t_pos])
             if ch_c[t_pos] > ob_h:
                 ch_cand[k] = 0
                 continue
-
-        near_ts = int(ch_ts[t_pos])
-        ch_near[k] = near_ts
 
         inter_h = float(np.max(ch_h[k + 1 : t_pos + 1]))
         inter_l = float(np.min(ch_l[k + 1 : t_pos + 1]))
@@ -340,14 +345,13 @@ def compute_ram_overlays(candle_arrays: tuple, symbol: str, resolution: str, mtf
         if 0 <= c_pos < m and ch_end_ts[c_pos] > bb_ts:
             ch_bb_chart[k] = int(ch_ts[c_pos])
 
+    # 1. Build OB SETUP records (full Stages 1-10)
     ob_by_ts = {}
     confirmed_records = []
     cand_indices = np.flatnonzero(ch_cand == 1)
 
     if cand_indices.size > 0:
-        cand_ts_arr = ch_ts[cand_indices]
-        cand_dt_arr = format_kolkata_timestamps(cand_ts_arr)
-
+        cand_dt_arr = format_kolkata_timestamps(ch_ts[cand_indices])
         for idx_pos, k in enumerate(cand_indices):
             start_t = int(ch_ts[k])
             end_t = int(ch_bb_raw[k])
@@ -393,7 +397,40 @@ def compute_ram_overlays(candle_arrays: tuple, symbol: str, resolution: str, mtf
             ob_by_ts[start_t] = rec
             confirmed_records.append(rec)
 
-    return ob_by_ts, ir_states, confirmed_records
+    # 2. Build NEW OB records (candidate + one-side move + 5C streak BEFORE retracement)
+    simple_obs = []
+    if prelim_indices.size > 0:
+        for k in prelim_indices:
+            start_t = int(ch_ts[k])
+            move_end_t = int(ch_end_ts[k + 1])
+            req_c = int(ch_trend[k])
+            fc_vals = {"1m": None, "3m": None, "5m": None}
+            any_conf = False
+
+            for c_res in CONFIRM_RES:
+                mtf = mtf_cache.get(c_res)
+                if mtf is not None:
+                    mv = exact_five_movement_np(*mtf[:5], start_t, move_end_t, req_c, col_arr=mtf[5])
+                    if mv is not None:
+                        fc_vals[c_res] = float(mv)
+                        any_conf = True
+
+            if not any_conf:
+                continue
+
+            simple_obs.append({
+                "time": start_t,
+                "high": float(ch_h[k]),
+                "low": float(ch_l[k]),
+                "setup_trend": req_c,
+                "momentum": float(ch_h[k + 1] - ch_l[k + 1]),
+                "end_time": int(ch_near[k]),
+                "five_candle_movement_1m": fc_vals["1m"],
+                "five_candle_movement_3m": fc_vals["3m"],
+                "five_candle_movement_5m": fc_vals["5m"],
+            })
+
+    return ob_by_ts, simple_obs, ir_states, confirmed_records
 
 
 def _load_mtf_from_source(symbol: str) -> dict:
@@ -426,11 +463,12 @@ def build_ind_db_for_symbol(symbol: str, resolutions=None, send_live: bool = Fal
             if candle_data is None or len(candle_data[0]) == 0:
                 continue
 
-            ob_by_ts, ir_states, confirmed_records = compute_ram_overlays(
+            ob_by_ts, simple_obs, ir_states, confirmed_records = compute_ram_overlays(
                 candle_data, clean_sym, res, mtf_cache
             )
-            _RAM_OVERLAY_CACHE[(clean_sym, res)] = (ob_by_ts, ir_states)
+            _RAM_OVERLAY_CACHE[(clean_sym, res)] = (ob_by_ts, simple_obs, ir_states)
             process_ob_alerts(confirmed_records, clean_sym, res, send_live=send_live)
+            process_simple_ob_alerts(simple_obs, clean_sym, res, send_live=send_live)
 
             total_candidates += len(confirmed_records)
             built_tables += 1
@@ -438,14 +476,14 @@ def build_ind_db_for_symbol(symbol: str, resolutions=None, send_live: bool = Fal
     if resolutions is None:
         print(
             f"[RAM Indicator Engine] {clean_sym}: Computed {built_tables} resolutions in RAM "
-            f"({total_candidates} final 5C OBs)."
+            f"({total_candidates} final 5C OB Setups)."
         )
     return total_candidates
 
 
 def build_all_ind_dbs() -> None:
     t0 = datetime.now()
-    print("Computing Order Block + R7 Impulse-Retrace overlays in RAM across all symbols...")
+    print("Computing OB Setup + OB + R7 Impulse-Retrace overlays in RAM across all symbols...")
     send_startup_welcome_message(SYMBOL_LIST)
     with ThreadPoolExecutor(max_workers=min(len(SYMBOL_LIST), 4)) as executor:
         list(executor.map(build_ind_db_for_symbol, SYMBOL_LIST))
@@ -465,14 +503,14 @@ def get_ob_chart_data(symbol: str, resolution: str) -> dict:
     clean_sym = str(symbol).replace(".", "_").replace("-", "_").upper()
     raw_candles = get_all_candles(clean_sym, resolution)
     if not raw_candles:
-        return {"candles": [], "order_blocks": [], "impulse_retrace": []}
+        return {"candles": [], "order_blocks": [], "simple_obs": [], "impulse_retrace": []}
 
     cached = _RAM_OVERLAY_CACHE.get((clean_sym, resolution))
     if cached is None:
         build_ind_db_for_symbol(clean_sym, resolutions=[resolution], send_live=False)
-        cached = _RAM_OVERLAY_CACHE.get((clean_sym, resolution), ({}, {}))
+        cached = _RAM_OVERLAY_CACHE.get((clean_sym, resolution), ({}, [], {}))
 
-    ob_by_ts, ir_states = cached
+    ob_by_ts, simple_obs, ir_states = cached
     enriched_candles = []
     order_blocks = []
     impulse_points = []
@@ -521,6 +559,7 @@ def get_ob_chart_data(symbol: str, resolution: str) -> dict:
     return {
         "candles": enriched_candles,
         "order_blocks": order_blocks,
+        "simple_obs": simple_obs,
         "impulse_retrace": impulse_points,
     }
 
