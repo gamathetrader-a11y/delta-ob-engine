@@ -19,6 +19,7 @@
         }
         #chart-wrapper { position: relative; width: 100vw; height: 100vh; height: 100dvh; }
         #chart { width: 100%; height: 100%; }
+        #chart.measuring { cursor: crosshair !important; }
         #ob-canvas { position: absolute; top: 0; left: 0; pointer-events: none; z-index: 5; }
         #top-bar {
             position: absolute; top: 12px; left: 12px; right: 72px;
@@ -63,6 +64,24 @@
         .tv-btn.wave-btn.active {
             color: #FFD700; background: rgba(255, 215, 0, .12); border-color: rgba(255, 215, 0, .45);
         }
+        .tv-btn.measure-btn.active {
+            color: #60a5fa; background: rgba(96, 165, 250, .16); border-color: rgba(96, 165, 250, .55);
+        }
+        .tv-btn.long-btn.active {
+            color: #26a69a; background: rgba(38, 166, 154, .18); border-color: rgba(38, 166, 154, .6);
+        }
+        .tv-btn.short-btn.active {
+            color: #ef5350; background: rgba(239, 83, 80, .18); border-color: rgba(239, 83, 80, .6);
+        }
+        .tv-btn.magnet-weak {
+            color: #38bdf8; background: rgba(56, 189, 248, .16); border-color: rgba(56, 189, 248, .55); opacity: 1;
+        }
+        .tv-btn.magnet-strong {
+            color: #c084fc; background: rgba(192, 132, 252, .18); border-color: rgba(192, 132, 252, .65); opacity: 1;
+        }
+        .tv-btn.lock-active {
+            color: #f59e0b; background: rgba(245, 158, 11, .18); border-color: rgba(245, 158, 11, .6); opacity: 1;
+        }
         .tv-select option { background: #1e222d; color: #d1d4dc; }
         .ohlc-metrics { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
         .label { color: #787b86; margin-right: 2px; }
@@ -76,6 +95,24 @@
         .timer-box { border-left: 1px solid #363c4e; padding-left: 10px; white-space: nowrap; }
         #lbl-timer { color: #2962ff; }
         #ob-info-panel { display: none; font-size: 12px; border-color: rgba(41, 98, 255, .5); }
+
+        /* Dropdown Menus (Lock & Remove) */
+        .tool-menu-wrap { position: relative; display: inline-flex; }
+        .tool-dropdown {
+            display: none; position: absolute; top: calc(100% + 6px); right: 0; z-index: 35;
+            background: rgba(24, 28, 38, 0.98); border: 1px solid #363c4e;
+            border-radius: 6px; padding: 4px; min-width: 175px;
+            box-shadow: 0 10px 24px rgba(0, 0, 0, 0.55);
+        }
+        .tool-dropdown.open { display: flex; flex-direction: column; gap: 2px; }
+        .tool-dropdown button {
+            background: transparent; border: none; color: #d1d4dc; text-align: left;
+            padding: 7px 10px; border-radius: 4px; font-size: 12px; font-weight: 600;
+            cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+        }
+        .tool-dropdown button:hover:not(:disabled) { background: #2a2e39; color: #fff; }
+        .tool-dropdown button.danger:hover:not(:disabled) { background: rgba(239, 83, 80, .2); color: #f87171; }
+        .tool-dropdown button:disabled { opacity: 0.4; cursor: not-allowed; }
 
         #ob-settings-popover {
             display: none; position: absolute; top: 96px; left: 12px; z-index: 30;
@@ -107,6 +144,32 @@
         #btn-ob-reset-filter { background: #2a2e39; color: #cbd5e1; border: 1px solid #363c4e; }
         #btn-ob-apply-filter { background: #2962ff; color: #fff; border: 1px solid #2962ff; }
 
+        /* Position Edit Modal */
+        #pos-edit-modal {
+            display: none; position: fixed; inset: 0; z-index: 50;
+            background: rgba(0, 0, 0, 0.55); backdrop-filter: blur(2px);
+            align-items: center; justify-content: center;
+        }
+        #pos-edit-modal.open { display: flex; }
+        .pos-modal-card {
+            background: #181c26; border: 1px solid #363c4e; border-radius: 8px;
+            padding: 14px; width: 290px; max-width: calc(100vw - 24px);
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.65); font-size: 12px;
+        }
+        .pos-modal-error {
+            color: #f87171; font-size: 11px; margin-bottom: 8px; display: none;
+        }
+        .pos-field { margin-bottom: 10px; }
+        .pos-field label {
+            display: block; color: #cbd5e1; font-size: 11px; font-weight: 600; margin-bottom: 4px;
+        }
+        .pos-field input {
+            width: 100%; background: #131722; color: #fff; border: 1px solid #363c4e;
+            border-radius: 4px; padding: 6px 8px; font-size: 12.5px; outline: none;
+            font-variant-numeric: tabular-nums;
+        }
+        .pos-field input:focus { border-color: #2962ff; }
+
         #chart-nav {
             position: absolute; bottom: 28px; left: 50%;
             transform: translateX(-50%) translateY(10px);
@@ -118,16 +181,18 @@
         #chart-nav.visible { opacity: 1; visibility: visible; transform: translateX(-50%) translateY(0); }
         .nav-btn {
             background: transparent; border: none; color: #d1d4dc;
-            padding: 8px 14px; font-size: 15px; border-radius: 6px; cursor: pointer;
+            padding: 7px 12px; font-size: 15px; border-radius: 6px; cursor: pointer;
+            transition: background .15s ease, color .15s ease, transform .1s ease;
         }
-        .nav-btn:hover, .nav-btn:active { background: #2a2e39; color: #fff; }
+        .nav-btn:hover { background: #2962ff; color: #ffffff; transform: translateY(-1px); }
+        .nav-btn:active { transform: scale(0.94); }
         @media (max-width: 768px) {
             #top-bar { top: 6px; left: 6px; right: 6px; gap: 4px; font-size: 11px; }
             .panel-box { padding: 4px 7px; gap: 6px; width: 100%; justify-content: space-between; }
             #status-panel { width: auto; flex: 1 1 auto; }
             .selector-group { border-right: none; padding-right: 0; width: 100%; justify-content: space-between; gap: 4px; flex-wrap: wrap; }
             .tv-select, .tv-btn { padding: 4px 5px; font-size: 10.5px; flex: 1 1 auto; text-align: center; }
-            .btn-group { flex: 1 1 auto; }
+            .btn-group, .tool-menu-wrap { flex: 1 1 auto; }
             .ohlc-metrics {
                 width: 100%; justify-content: space-between; gap: 4px; font-size: 11px;
                 border-top: 1px solid #2a2e39; padding-top: 4px;
@@ -164,6 +229,24 @@
                     <button id="btn-ob-settings" class="tv-btn settings-btn" title="OB Momentum Settings">⚙</button>
                 </div>
                 <button id="btn-wave-toggle" class="tv-btn wave-btn active" title="Show/Hide Wave">👁 Wave</button>
+                <button id="btn-measure-toggle" class="tv-btn measure-btn" title="Measure Tool (Shift+Click)">📏</button>
+                <button id="btn-long-pos" class="tv-btn long-btn" title="Long Position (Risk/Reward)">Long</button>
+                <button id="btn-short-pos" class="tv-btn short-btn" title="Short Position (Risk/Reward)">Short</button>
+                <button id="btn-magnet-toggle" class="tv-btn" title="Magnet: OFF (Hold Ctrl for Strong Magnet)">🧲</button>
+                <div class="tool-menu-wrap">
+                    <button id="btn-lock-menu" class="tv-btn" title="Lock Drawings">🔓 ▾</button>
+                    <div id="lock-dropdown" class="tool-dropdown">
+                        <button id="btn-lock-selected" type="button">🔒 Lock Selected</button>
+                        <button id="btn-lock-all" type="button">🔒 Lock All Objects</button>
+                    </div>
+                </div>
+                <div class="tool-menu-wrap">
+                    <button id="btn-remove-menu" class="tv-btn" title="Remove Drawings">🗑️ ▾</button>
+                    <div id="remove-dropdown" class="tool-dropdown">
+                        <button id="btn-remove-selected" class="danger" type="button">✕ Remove Selected</button>
+                        <button id="btn-remove-all" class="danger" type="button">🗑️ Remove All Drawings</button>
+                    </div>
+                </div>
             </div>
             <div class="ohlc-metrics">
                 <div id="lbl-candle-time">--</div>
@@ -221,12 +304,38 @@
         </div>
     </div>
 
+    <div id="pos-edit-modal">
+        <div class="pos-modal-card">
+            <div class="settings-header">
+                <span id="pos-modal-title">Edit Position</span>
+                <button class="settings-close" id="btn-pos-modal-close" title="Close">&times;</button>
+            </div>
+            <div class="pos-field">
+                <label for="pos-input-entry">Entry Price</label>
+                <input type="text" id="pos-input-entry" inputmode="decimal" autocomplete="off" placeholder="0.00">
+            </div>
+            <div class="pos-field">
+                <label for="pos-input-tp" style="color:#4ade80;">Profit Price (Target)</label>
+                <input type="text" id="pos-input-tp" inputmode="decimal" autocomplete="off" placeholder="0.00">
+            </div>
+            <div class="pos-field">
+                <label for="pos-input-sl" style="color:#f87171;">Stoploss Price</label>
+                <input type="text" id="pos-input-sl" inputmode="decimal" autocomplete="off" placeholder="0.00">
+            </div>
+            <div id="pos-modal-error" class="pos-modal-error"></div>
+            <div class="settings-actions">
+                <button id="btn-pos-cancel" type="button" style="background:#2a2e39;color:#cbd5e1;border:1px solid #363c4e;">Cancel</button>
+                <button id="btn-pos-save" type="button" style="background:#2962ff;color:#fff;border:1px solid #2962ff;">Apply</button>
+            </div>
+        </div>
+    </div>
+
     <div id="chart-nav">
         <button class="nav-btn" id="btn-zoom-out" title="Zoom Out">−</button>
         <button class="nav-btn" id="btn-zoom-in" title="Zoom In">+</button>
         <button class="nav-btn" id="btn-scroll-left" title="Scroll Left">&lt;</button>
         <button class="nav-btn" id="btn-scroll-right" title="Scroll Right">&gt;</button>
-        <button class="nav-btn" id="btn-reset" title="Jump to Live">⟳</button>
+        <button class="nav-btn" id="btn-reset" title="Reset Chart View">⟳</button>
     </div>
     <div id="chart-wrapper">
         <div id="chart"></div>
@@ -254,6 +363,15 @@
             return 900;
         }
 
+        function formatDuration(totalSec) {
+            const sec = Math.abs(Math.round(totalSec));
+            if (sec < 60) return `${sec}s`;
+            const d = Math.floor(sec / 86400), h = Math.floor((sec % 86400) / 3600), m = Math.floor((sec % 3600) / 60);
+            if (d > 0) return h > 0 ? `${d}d ${h}h` : `${d}d`;
+            if (h > 0) return m > 0 ? `${h}h ${m}m` : `${h}h`;
+            return `${m}m`;
+        }
+
         function dedupeSort(items, keyFn, valid) {
             if (!items || !items.length) return [];
             let sorted = true, prevK = -Infinity;
@@ -273,8 +391,7 @@
         function prepOb(ob) {
             ob._start = Number(ob.time);
             ob._end = ob.breakout_breakdown_candle > 0 ? Number(ob.breakout_breakdown_candle) : 0;
-            ob._high = Number(ob.high);
-            ob._low = Number(ob.low);
+            ob._high = Number(ob.high); ob._low = Number(ob.low);
             ob._bull = Number(ob.setup_trend) === 1;
             ob._hasEdge = isNum(ob.price_edge);
             ob._edge = ob._hasEdge ? Number(ob.price_edge) : 0;
@@ -284,8 +401,7 @@
         function prepSimpleOb(ob) {
             ob._start = Number(ob.time);
             ob._end = ob.end_time > 0 ? Number(ob.end_time) : 0;
-            ob._high = Number(ob.high);
-            ob._low = Number(ob.low);
+            ob._high = Number(ob.high); ob._low = Number(ob.low);
             ob._bull = Number(ob.setup_trend) === 1;
             ob._mom = isNum(ob.momentum) ? Number(ob.momentum) : 0;
             return ob;
@@ -297,11 +413,19 @@
             const statusEl = $('status'), statsBadge = $('stats-badge'), navToolbar = $('chart-nav');
             const symbolSelect = $('symbol-select'), resolutionSelect = $('resolution-select');
             const btnObToggle = $('btn-ob-toggle'), btnSimpleObToggle = $('btn-simple-ob-toggle'), btnWaveToggle = $('btn-wave-toggle');
+            const btnMeasureToggle = $('btn-measure-toggle'), btnLongPos = $('btn-long-pos'), btnShortPos = $('btn-short-pos');
+            const btnMagnetToggle = $('btn-magnet-toggle');
+            const btnLockMenu = $('btn-lock-menu'), lockDropdown = $('lock-dropdown');
+            const btnLockSelected = $('btn-lock-selected'), btnLockAll = $('btn-lock-all');
+            const btnRemoveMenu = $('btn-remove-menu'), removeDropdown = $('remove-dropdown');
+            const btnRemoveSelected = $('btn-remove-selected'), btnRemoveAll = $('btn-remove-all');
             const btnObSettings = $('btn-ob-settings'), obSettingsPopover = $('ob-settings-popover');
             const inputMinMom = $('input-min-mom'), inputMaxMom = $('input-max-mom');
             const inputMin1m = $('input-min-1m'), inputMax1m = $('input-max-1m');
             const inputMin3m = $('input-min-3m'), inputMax3m = $('input-max-3m');
             const inputMin5m = $('input-min-5m'), inputMax5m = $('input-max-5m');
+            const posEditModal = $('pos-edit-modal'), posModalTitle = $('pos-modal-title'), posModalError = $('pos-modal-error');
+            const posInputEntry = $('pos-input-entry'), posInputTp = $('pos-input-tp'), posInputSl = $('pos-input-sl');
             const obInfoPanel = $('ob-info-panel'), obInfoText = $('ob-info-text');
             const lblCandleTime = $('lbl-candle-time'), lblOpen = $('lbl-open'), lblHigh = $('lbl-high'), lblLow = $('lbl-low'), lblClose = $('lbl-close'), lblTimer = $('lbl-timer');
             const countSpan = $('ob-count'), simpleCountSpan = $('simple-ob-count');
@@ -309,14 +433,123 @@
             let activeSymbol = symbolSelect.value, activeResolution = resolutionSelect.value;
             let activeIntervalSec = getResolutionSeconds(activeResolution);
             let eventSource = null, loadAbort = null, overlayAbort = null, overlayTimer = null, currentLoadId = 0;
-            let candlesByTime = new Map(), timeToIndexMap = new Map();
+            let candlesByTime = new Map(), timeToIndexMap = new Map(), candlesList = [];
             let orderBlocks = [], obByTimestamp = new Map();
             let simpleObs = [], filteredSimpleObs = [], filteredSimpleObByTimestamp = new Map();
             let impulsePoints = [];
             let showObZones = true, showSimpleObs = true, showWave = true;
+            let measureMode = false, measureState = null;
+            let posToolMode = null, positions = [], selectedPosId = null, dragPos = null, editingPos = null;
+            let magnetMode = 'off', ctrlMagnetActive = false;
+            let lockAllObjects = false, activePriceLines = [];
             const obFilter = { minMom: null, maxMom: null, min1m: null, max1m: null, min3m: null, max3m: null, min5m: null, max5m: null };
+            const OB_FILTER_PREFIX = 'delta_ob_filter_v1_', POS_STORAGE_PREFIX = 'delta_positions_v1_';
+            const obSettingsTitle = obSettingsPopover.querySelector('.settings-header span');
             let latestCandle = null, isHoveringCandle = false, drawPending = false, lastFormattedTimeTs = -1;
-            let cssW = 0, cssH = 0;
+            let cssW = 0, cssH = 0, navHideTimer = null;
+
+            const getSelectedPos = () => selectedPosId !== null ? positions.find(p => p.id === selectedPosId) || null : null;
+            const isPosLocked = p => lockAllObjects || Boolean(p && p.locked);
+
+            function closeAllPopovers(except = null) {
+                if (except !== obSettingsPopover) obSettingsPopover.classList.remove('open');
+                if (except !== lockDropdown) lockDropdown.classList.remove('open');
+                if (except !== removeDropdown) removeDropdown.classList.remove('open');
+            }
+
+            function syncToolMenus() {
+                const sel = getSelectedPos();
+                btnLockSelected.disabled = !sel;
+                btnLockSelected.textContent = (sel && sel.locked) ? '🔓 Unlock Selected' : '🔒 Lock Selected';
+                btnLockAll.textContent = lockAllObjects ? '🔓 Unlock All Objects' : '🔒 Lock All Objects';
+                btnLockMenu.textContent = lockAllObjects ? '🔒 ▾' : '🔓 ▾';
+                btnLockMenu.classList.toggle('lock-active', lockAllObjects || Boolean(sel && sel.locked));
+
+                btnRemoveSelected.disabled = !sel;
+                btnRemoveAll.disabled = !positions.length && !measureState;
+            }
+
+            function syncFilterInputs() {
+                inputMinMom.value = obFilter.minMom ?? ''; inputMaxMom.value = obFilter.maxMom ?? '';
+                inputMin1m.value = obFilter.min1m ?? ''; inputMax1m.value = obFilter.max1m ?? '';
+                inputMin3m.value = obFilter.min3m ?? ''; inputMax3m.value = obFilter.max3m ?? '';
+                inputMin5m.value = obFilter.min5m ?? ''; inputMax5m.value = obFilter.max5m ?? '';
+                if (obSettingsTitle) obSettingsTitle.textContent = `⚙ OB Filter (${activeSymbol})`;
+            }
+
+            function loadObFilterForSymbol(sym) {
+                Object.keys(obFilter).forEach(k => obFilter[k] = null);
+                try {
+                    const raw = localStorage.getItem(OB_FILTER_PREFIX + sym);
+                    if (raw) {
+                        const saved = JSON.parse(raw);
+                        Object.keys(obFilter).forEach(k => { if (isNum(saved[k])) obFilter[k] = Number(saved[k]); });
+                    }
+                } catch (e) {}
+                syncFilterInputs();
+            }
+
+            function saveObFilterForSymbol(sym) {
+                try {
+                    if (Object.values(obFilter).some(v => v !== null)) localStorage.setItem(OB_FILTER_PREFIX + sym, JSON.stringify(obFilter));
+                    else localStorage.removeItem(OB_FILTER_PREFIX + sym);
+                } catch (e) {}
+            }
+
+            function logicalToTime(logical) {
+                if (!candlesList.length) return null;
+                const idx = Math.round(logical);
+                if (idx >= 0 && idx < candlesList.length) return Number(candlesList[idx].time);
+                if (idx >= candlesList.length) return Number(candlesList[candlesList.length - 1].time) + (idx - (candlesList.length - 1)) * activeIntervalSec;
+                return Number(candlesList[0].time) + idx * activeIntervalSec;
+            }
+
+            function timeToLogical(ts) {
+                if (!candlesList.length || !Number.isFinite(ts)) return null;
+                const exact = timeToIndexMap.get(ts);
+                if (exact !== undefined) return exact;
+                const firstTs = Number(candlesList[0].time), lastIdx = candlesList.length - 1, lastTs = Number(candlesList[lastIdx].time);
+                if (ts >= lastTs) return lastIdx + (ts - lastTs) / activeIntervalSec;
+                if (ts <= firstTs) return (ts - firstTs) / activeIntervalSec;
+                let lo = 0, hi = lastIdx;
+                while (lo <= hi) {
+                    const mid = (lo + hi) >> 1, mt = Number(candlesList[mid].time);
+                    if (mt === ts) return mid;
+                    if (mt < ts) lo = mid + 1; else hi = mid - 1;
+                }
+                return lo;
+            }
+
+            function syncPositionsToLogical() {
+                for (let i = 0; i < positions.length; i++) {
+                    const p = positions[i];
+                    if (Number.isFinite(p.startTime)) { const l1 = timeToLogical(p.startTime); if (l1 !== null) p.startLogical = l1; }
+                    if (Number.isFinite(p.endTime)) { const l2 = timeToLogical(p.endTime); if (l2 !== null) p.endLogical = l2; }
+                }
+            }
+
+            function loadPositionsForSymbol(sym) {
+                positions = []; selectedPosId = null;
+                try {
+                    const raw = localStorage.getItem(POS_STORAGE_PREFIX + sym);
+                    if (raw) { const saved = JSON.parse(raw); if (Array.isArray(saved)) positions = saved; }
+                } catch (e) {}
+                syncToolMenus();
+            }
+
+            function savePositionsForSymbol(sym) {
+                try {
+                    for (let i = 0; i < positions.length; i++) {
+                        const p = positions[i];
+                        const t1 = logicalToTime(p.startLogical), t2 = logicalToTime(p.endLogical);
+                        if (t1 !== null) p.startTime = t1;
+                        if (t2 !== null) p.endTime = t2;
+                    }
+                    if (positions.length) localStorage.setItem(POS_STORAGE_PREFIX + sym, JSON.stringify(positions));
+                    else localStorage.removeItem(POS_STORAGE_PREFIX + sym);
+                } catch (e) {}
+                syncToolMenus();
+            }
 
             const chart = LightweightCharts.createChart(chartElement, {
                 width: chartElement.clientWidth, height: chartElement.clientHeight,
@@ -333,6 +566,60 @@
             const impulseRetraceSeries = chart.addLineSeries({ color: WAVE_GOLD, lineWidth: 2, lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false, title: "Impulse-Retrace", autoscaleInfoProvider: () => null });
             const timeScale = chart.timeScale();
 
+            function syncPositionPriceLines() {
+                for (let i = 0; i < activePriceLines.length; i++) {
+                    try { candleSeries.removePriceLine(activePriceLines[i]); } catch (e) {}
+                }
+                activePriceLines = [];
+                if (!positions.length) return;
+                const targets = selectedPosId !== null ? positions.filter(p => p.id === selectedPosId) : positions;
+                for (let i = 0; i < targets.length; i++) {
+                    const p = targets[i];
+                    activePriceLines.push(
+                        candleSeries.createPriceLine({ price: p.tp, color: '#26a69a', lineVisible: false, axisLabelVisible: true, title: '' }),
+                        candleSeries.createPriceLine({ price: p.entry, color: '#64748b', lineVisible: false, axisLabelVisible: true, title: '' }),
+                        candleSeries.createPriceLine({ price: p.sl, color: '#ef5350', lineVisible: false, axisLabelVisible: true, title: '' })
+                    );
+                }
+            }
+
+            function updateMagnetUI() {
+                const eff = ctrlMagnetActive ? 'strong' : magnetMode;
+                btnMagnetToggle.classList.remove('magnet-weak', 'magnet-strong');
+                if (eff === 'weak') {
+                    btnMagnetToggle.classList.add('magnet-weak'); btnMagnetToggle.textContent = '🧲';
+                    btnMagnetToggle.title = 'Weak Magnet: ON (Hold Ctrl for Strong Magnet)';
+                } else if (eff === 'strong') {
+                    btnMagnetToggle.classList.add('magnet-strong'); btnMagnetToggle.textContent = '🧲+';
+                    btnMagnetToggle.title = ctrlMagnetActive ? 'Strong Magnet (Ctrl Held)' : 'Strong Magnet: ON (Always snaps to OHLC)';
+                } else {
+                    btnMagnetToggle.textContent = '🧲'; btnMagnetToggle.title = 'Magnet: OFF (Hold Ctrl for Strong Magnet)';
+                }
+                chart.applyOptions({ crosshair: { mode: eff === 'off' ? LightweightCharts.CrosshairMode.Normal : LightweightCharts.CrosshairMode.Magnet } });
+            }
+
+            btnMagnetToggle.addEventListener('click', () => {
+                magnetMode = magnetMode === 'off' ? 'weak' : (magnetMode === 'weak' ? 'strong' : 'off');
+                updateMagnetUI();
+            });
+
+            function snapToOHLC(logical, price, rawY, forceStrong = false) {
+                const mode = (forceStrong || ctrlMagnetActive) ? 'strong' : magnetMode;
+                if (mode === 'off' || !candlesList.length) return { logical, price };
+                const idx = Math.max(0, Math.min(candlesList.length - 1, Math.round(logical)));
+                const bar = candlesList[idx];
+                if (!bar) return { logical, price };
+                const ohlc = [Number(bar.open), Number(bar.high), Number(bar.low), Number(bar.close)];
+                let bestPrice = price, bestDistPx = Infinity;
+                for (let i = 0; i < 4; i++) {
+                    const cy = candleSeries.priceToCoordinate(ohlc[i]);
+                    if (cy === null) continue;
+                    const dist = Math.abs(cy - rawY);
+                    if (dist < bestDistPx) { bestDistPx = dist; bestPrice = ohlc[i]; }
+                }
+                return (mode === 'strong' || bestDistPx <= 24) ? { logical: idx, price: bestPrice } : { logical, price };
+            }
+
             function passesRange(val, minV, maxV) {
                 if (minV === null && maxV === null) return true;
                 if (!isNum(val)) return false;
@@ -341,8 +628,7 @@
             }
 
             function rebuildFilteredSimpleObs() {
-                filteredSimpleObs = [];
-                filteredSimpleObByTimestamp = new Map();
+                filteredSimpleObs = []; filteredSimpleObByTimestamp = new Map();
                 const has1m = obFilter.min1m !== null || obFilter.max1m !== null;
                 const has3m = obFilter.min3m !== null || obFilter.max3m !== null;
                 const has5m = obFilter.min5m !== null || obFilter.max5m !== null;
@@ -397,6 +683,106 @@
                 drawOrderBlocks();
             }
 
+            function drawPositions() {
+                if (!positions.length) return;
+                const chartWidth = cssW - (isMobile() ? 54 : 65);
+                for (let i = 0; i < positions.length; i++) {
+                    const p = positions[i];
+                    const x1 = timeScale.logicalToCoordinate(p.startLogical), x2 = timeScale.logicalToCoordinate(p.endLogical);
+                    const yEntry = candleSeries.priceToCoordinate(p.entry), yTp = candleSeries.priceToCoordinate(p.tp), ySl = candleSeries.priceToCoordinate(p.sl);
+                    if (x1 === null || x2 === null || yEntry === null || yTp === null || ySl === null) continue;
+
+                    const left = Math.max(0, Math.min(x1, x2)), right = Math.min(chartWidth, Math.max(x1, x2, left + 24));
+                    if (right <= left) continue;
+                    const w = right - left, locked = isPosLocked(p);
+
+                    ctx.save();
+                    const tpTop = Math.min(yEntry, yTp), tpH = Math.abs(yEntry - yTp);
+                    ctx.fillStyle = 'rgba(38, 166, 154, 0.22)'; ctx.fillRect(left, tpTop, w, tpH);
+                    ctx.strokeStyle = 'rgba(38, 166, 154, 0.85)'; ctx.lineWidth = 1; ctx.strokeRect(left, tpTop, w, tpH);
+
+                    const slTop = Math.min(yEntry, ySl), slH = Math.abs(yEntry - ySl);
+                    ctx.fillStyle = 'rgba(239, 83, 80, 0.22)'; ctx.fillRect(left, slTop, w, slH);
+                    ctx.strokeStyle = 'rgba(239, 83, 80, 0.85)'; ctx.strokeRect(left, slTop, w, slH);
+
+                    ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 1.5;
+                    ctx.beginPath(); ctx.moveTo(left, yEntry); ctx.lineTo(right, yEntry); ctx.stroke();
+
+                    const risk = Math.abs(p.entry - p.sl), reward = Math.abs(p.tp - p.entry);
+                    const rr = risk > 0 ? (reward / risk).toFixed(2) : '∞';
+                    const tpPct = p.entry ? ((reward / p.entry) * 100).toFixed(2) : '0.00';
+                    const slPct = p.entry ? ((risk / p.entry) * 100).toFixed(2) : '0.00';
+                    const midX = left + w / 2;
+
+                    ctx.font = 'bold 10.5px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    if (tpH >= 16) { ctx.fillStyle = '#4ade80'; ctx.fillText(`Target: +${reward.toFixed(2)} (+${tpPct}%)`, midX, tpTop + tpH / 2); }
+                    if (slH >= 16) { ctx.fillStyle = '#f87171'; ctx.fillText(`Stop: -${risk.toFixed(2)} (-${slPct}%)`, midX, slTop + slH / 2); }
+
+                    const rrText = `${locked ? '🔒 ' : ''}${p.type === 'long' ? 'LONG' : 'SHORT'}  R:R 1 : ${rr}`;
+                    const pillW = ctx.measureText(rrText).width + 14;
+                    ctx.fillStyle = selectedPosId === p.id ? (locked ? '#b45309' : '#2962ff') : '#1e222d';
+                    ctx.strokeStyle = locked ? '#f59e0b' : '#475569';
+                    ctx.beginPath();
+                    if (ctx.roundRect) ctx.roundRect(midX - pillW / 2, yEntry - 10, pillW, 20, 4);
+                    else ctx.rect(midX - pillW / 2, yEntry - 10, pillW, 20);
+                    ctx.fill(); ctx.stroke();
+                    ctx.fillStyle = '#ffffff'; ctx.fillText(rrText, midX, yEntry);
+
+                    if (selectedPosId === p.id && !locked) {
+                        ctx.fillStyle = '#ffffff'; ctx.strokeStyle = '#2962ff'; ctx.lineWidth = 1.5;
+                        for (const [hx, hy] of [[midX, yTp], [midX, ySl], [left, yEntry], [right, yEntry]]) {
+                            ctx.beginPath(); ctx.arc(hx, hy, 4.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+                        }
+                    }
+                    ctx.restore();
+                }
+            }
+
+            function drawMeasureTool() {
+                if (!measureState || !measureState.p1 || !measureState.p2) return;
+                const x1 = timeScale.logicalToCoordinate(measureState.p1.logical), y1 = candleSeries.priceToCoordinate(measureState.p1.price);
+                const x2 = timeScale.logicalToCoordinate(measureState.p2.logical), y2 = candleSeries.priceToCoordinate(measureState.p2.price);
+                if (x1 === null || y1 === null || x2 === null || y2 === null) return;
+
+                const isUp = measureState.p2.price >= measureState.p1.price;
+                const fillCol = isUp ? 'rgba(41, 98, 255, 0.20)' : 'rgba(239, 83, 80, 0.20)';
+                const strokeCol = isUp ? '#2962ff' : '#ef5350';
+                const left = Math.min(x1, x2), top = Math.min(y1, y2), w = Math.abs(x2 - x1), h = Math.abs(y2 - y1);
+
+                ctx.save();
+                ctx.fillStyle = fillCol; ctx.fillRect(left, top, w, h);
+                ctx.strokeStyle = strokeCol; ctx.lineWidth = 1.25; ctx.setLineDash([]); ctx.strokeRect(left, top, w, h);
+
+                const midX = (x1 + x2) / 2, midY = (y1 + y2) / 2;
+                ctx.beginPath(); ctx.moveTo(x1, midY); ctx.lineTo(x2, midY); ctx.moveTo(midX, y1); ctx.lineTo(midX, y2); ctx.stroke();
+
+                const diff = measureState.p2.price - measureState.p1.price;
+                const pct = measureState.p1.price !== 0 ? (diff / measureState.p1.price) * 100 : 0;
+                const bars = Math.abs(Math.round(measureState.p2.logical - measureState.p1.logical));
+                const sign = diff >= 0 ? '+' : '';
+                const line1 = `${sign}${diff.toFixed(2)} (${sign}${pct.toFixed(2)}%)`, line2 = `${bars} bars, ${formatDuration(bars * activeIntervalSec)}`;
+
+                ctx.font = 'bold 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+                const boxW = Math.max(ctx.measureText(line1).width, ctx.measureText(line2).width) + 18, boxH = 38;
+                const chartWidth = cssW - (isMobile() ? 54 : 65);
+                let bx = Math.max(6, Math.min(chartWidth - boxW - 6, midX - boxW / 2));
+                let by = isUp ? (top - boxH - 8) : (top + h + 8);
+                if (by < 6) by = top + h + 8;
+                if (by + boxH > cssH - 6) by = top - boxH - 8;
+
+                ctx.fillStyle = strokeCol;
+                ctx.beginPath();
+                if (ctx.roundRect) ctx.roundRect(bx, by, boxW, boxH, 5); else ctx.rect(bx, by, boxW, boxH);
+                ctx.fill();
+
+                ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(line1, bx + boxW / 2, by + 13);
+                ctx.font = '600 10.5px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+                ctx.fillText(line2, bx + boxW / 2, by + 27);
+                ctx.restore();
+            }
+
             function drawOrderBlocks() {
                 ctx.clearRect(0, 0, cssW, cssH);
                 const chartWidth = cssW - (isMobile() ? 54 : 65);
@@ -404,7 +790,6 @@
                 const visFrom = vis ? Number(vis.from) : -Infinity, visTo = vis ? Number(vis.to) : Infinity;
                 const lastTime = latestCandle ? Number(latestCandle.time) : 0;
 
-                // 1. Batched Borderless OB zones (Green = Bull, Red = Bear)
                 if (showSimpleObs && filteredSimpleObs.length) {
                     const bullBoxes = [], bearBoxes = [];
                     for (let i = 0; i < filteredSimpleObs.length; i++) {
@@ -418,8 +803,7 @@
                         if (yTop === null || yBot === null) continue;
                         const left = Math.max(0, Math.min(x1, x2)), right = Math.min(chartWidth, Math.max(x1, x2, left + 6));
                         if (right <= left) continue;
-                        const top = Math.min(yTop, yBot), height = Math.max(2, Math.abs(yBot - yTop));
-                        (ob._bull ? bullBoxes : bearBoxes).push(left, top, right - left, height);
+                        (ob._bull ? bullBoxes : bearBoxes).push(left, Math.min(yTop, yBot), right - left, Math.max(2, Math.abs(yBot - yTop)));
                     }
                     if (bullBoxes.length) {
                         ctx.fillStyle = 'rgba(38,166,154,0.22)';
@@ -431,65 +815,78 @@
                     }
                 }
 
-                // 2. Batched OB SETUP zones (Bordered Green = Bull, Red = Bear + Dashed Edge)
-                if (!showObZones || !orderBlocks.length) return;
-                const sBull = [], sBear = [], bullEdges = [], bearEdges = [];
-
-                for (let i = 0; i < orderBlocks.length; i++) {
-                    const ob = orderBlocks[i], startTime = ob._start;
-                    if (startTime > visTo) break;
-                    const endTime = ob._end > 0 ? ob._end : (lastTime || startTime);
-                    if (endTime < visFrom) continue;
-                    const x1 = getXCoordForTime(startTime), x2 = getXCoordForTime(endTime);
-                    if (x1 === null || x2 === null) continue;
-                    const yTop = candleSeries.priceToCoordinate(ob._high), yBot = candleSeries.priceToCoordinate(ob._low);
-                    if (yTop === null || yBot === null) continue;
-                    const left = Math.max(0, Math.min(x1, x2)), right = Math.min(chartWidth, Math.max(x1, x2, left + 6));
-                    if (right <= left) continue;
-                    const top = Math.min(yTop, yBot), height = Math.max(2, Math.abs(yBot - yTop)), isBull = ob._bull;
-                    (isBull ? sBull : sBear).push(left, top, right - left, height);
-                    if (ob._hasEdge) {
-                        const yEdge = candleSeries.priceToCoordinate(ob._edge);
-                        if (yEdge !== null) (isBull ? bullEdges : bearEdges).push(left, right, yEdge);
+                if (showObZones && orderBlocks.length) {
+                    const sBull = [], sBear = [], bullEdges = [], bearEdges = [];
+                    for (let i = 0; i < orderBlocks.length; i++) {
+                        const ob = orderBlocks[i], startTime = ob._start;
+                        if (startTime > visTo) break;
+                        const endTime = ob._end > 0 ? ob._end : (lastTime || startTime);
+                        if (endTime < visFrom) continue;
+                        const x1 = getXCoordForTime(startTime), x2 = getXCoordForTime(endTime);
+                        if (x1 === null || x2 === null) continue;
+                        const yTop = candleSeries.priceToCoordinate(ob._high), yBot = candleSeries.priceToCoordinate(ob._low);
+                        if (yTop === null || yBot === null) continue;
+                        const left = Math.max(0, Math.min(x1, x2)), right = Math.min(chartWidth, Math.max(x1, x2, left + 6));
+                        if (right <= left) continue;
+                        const isBull = ob._bull;
+                        (isBull ? sBull : sBear).push(left, Math.min(yTop, yBot), right - left, Math.max(2, Math.abs(yBot - yTop)));
+                        if (ob._hasEdge) {
+                            const yEdge = candleSeries.priceToCoordinate(ob._edge);
+                            if (yEdge !== null) (isBull ? bullEdges : bearEdges).push(left, right, yEdge);
+                        }
+                    }
+                    ctx.setLineDash([]); ctx.lineWidth = 1.25;
+                    if (sBull.length) {
+                        ctx.fillStyle = 'rgba(38,166,154,0.20)'; ctx.strokeStyle = 'rgba(38,166,154,0.88)';
+                        for (let i = 0; i < sBull.length; i += 4) { ctx.fillRect(sBull[i], sBull[i + 1], sBull[i + 2], sBull[i + 3]); ctx.strokeRect(sBull[i], sBull[i + 1], sBull[i + 2], sBull[i + 3]); }
+                    }
+                    if (sBear.length) {
+                        ctx.fillStyle = 'rgba(239,83,80,0.20)'; ctx.strokeStyle = 'rgba(239,83,80,0.88)';
+                        for (let i = 0; i < sBear.length; i += 4) { ctx.fillRect(sBear[i], sBear[i + 1], sBear[i + 2], sBear[i + 3]); ctx.strokeRect(sBear[i], sBear[i + 1], sBear[i + 2], sBear[i + 3]); }
+                    }
+                    if (bullEdges.length || bearEdges.length) {
+                        ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5;
+                        if (bullEdges.length) {
+                            ctx.strokeStyle = '#00e676'; ctx.beginPath();
+                            for (let i = 0; i < bullEdges.length; i += 3) { ctx.moveTo(bullEdges[i], bullEdges[i + 2]); ctx.lineTo(bullEdges[i + 1], bullEdges[i + 2]); }
+                            ctx.stroke();
+                        }
+                        if (bearEdges.length) {
+                            ctx.strokeStyle = '#ff5252'; ctx.beginPath();
+                            for (let i = 0; i < bearEdges.length; i += 3) { ctx.moveTo(bearEdges[i], bearEdges[i + 2]); ctx.lineTo(bearEdges[i + 1], bearEdges[i + 2]); }
+                            ctx.stroke();
+                        }
+                        ctx.setLineDash([]);
                     }
                 }
 
-                ctx.setLineDash([]); ctx.lineWidth = 1.25;
-                if (sBull.length) {
-                    ctx.fillStyle = 'rgba(38,166,154,0.20)'; ctx.strokeStyle = 'rgba(38,166,154,0.88)';
-                    for (let i = 0; i < sBull.length; i += 4) {
-                        ctx.fillRect(sBull[i], sBull[i + 1], sBull[i + 2], sBull[i + 3]);
-                        ctx.strokeRect(sBull[i], sBull[i + 1], sBull[i + 2], sBull[i + 3]);
-                    }
-                }
-                if (sBear.length) {
-                    ctx.fillStyle = 'rgba(239,83,80,0.20)'; ctx.strokeStyle = 'rgba(239,83,80,0.88)';
-                    for (let i = 0; i < sBear.length; i += 4) {
-                        ctx.fillRect(sBear[i], sBear[i + 1], sBear[i + 2], sBear[i + 3]);
-                        ctx.strokeRect(sBear[i], sBear[i + 1], sBear[i + 2], sBear[i + 3]);
-                    }
-                }
-
-                if (bullEdges.length || bearEdges.length) {
-                    ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5;
-                    if (bullEdges.length) {
-                        ctx.strokeStyle = '#00e676'; ctx.beginPath();
-                        for (let i = 0; i < bullEdges.length; i += 3) { ctx.moveTo(bullEdges[i], bullEdges[i + 2]); ctx.lineTo(bullEdges[i + 1], bullEdges[i + 2]); }
-                        ctx.stroke();
-                    }
-                    if (bearEdges.length) {
-                        ctx.strokeStyle = '#ff5252'; ctx.beginPath();
-                        for (let i = 0; i < bearEdges.length; i += 3) { ctx.moveTo(bearEdges[i], bearEdges[i + 2]); ctx.lineTo(bearEdges[i + 1], bearEdges[i + 2]); }
-                        ctx.stroke();
-                    }
-                    ctx.setLineDash([]);
-                }
+                drawPositions();
+                drawMeasureTool();
             }
 
+            function showNavBriefly() {
+                navToolbar.classList.add('visible');
+                clearTimeout(navHideTimer);
+                navHideTimer = setTimeout(() => { if (!navToolbar.matches(':hover')) navToolbar.classList.remove('visible'); }, 2200);
+            }
+
+            // Single unified pointermove handler on chartElement
             timeScale.subscribeVisibleLogicalRangeChange(scheduleDraw);
-            chartElement.addEventListener('pointermove', e => { if (e.buttons) scheduleDraw(); }, { passive: true });
+            chartElement.addEventListener('pointermove', e => {
+                if (measureState && !measureState.locked) {
+                    const pt = getPointFromEvent(e);
+                    if (pt) { measureState.p2 = pt; scheduleDraw(); }
+                } else if (e.buttons) {
+                    scheduleDraw();
+                }
+                const rect = chartElement.getBoundingClientRect();
+                if (rect.bottom - e.clientY <= 120) showNavBriefly();
+            }, { passive: true });
             chartElement.addEventListener('wheel', scheduleDraw, { passive: true });
             chartElement.addEventListener('touchmove', scheduleDraw, { passive: true });
+            navToolbar.addEventListener('mouseenter', () => { clearTimeout(navHideTimer); navToolbar.classList.add('visible'); });
+            navToolbar.addEventListener('mouseleave', () => { navHideTimer = setTimeout(() => navToolbar.classList.remove('visible'), 600); });
+            if (isMobile()) navToolbar.classList.add('visible');
 
             function updateMarkersAndStats() {
                 rebuildFilteredSimpleObs();
@@ -519,7 +916,8 @@
                 candleSeries.setMarkers([]); ctx.clearRect(0, 0, cssW, cssH);
                 const candles = dedupeSort(payload.candles, c => Number(c.time), c => Number.isFinite(Number(c.time)) && Number.isFinite(Number(c.open)) && Number.isFinite(Number(c.close)));
                 setWave(payload.impulse_retrace);
-                candlesByTime = new Map(); timeToIndexMap = new Map(); obByTimestamp = new Map(); orderBlocks = [];
+                candlesByTime = new Map(); timeToIndexMap = new Map(); candlesList = candles;
+                obByTimestamp = new Map(); orderBlocks = [];
                 simpleObs = (payload.simple_obs || []).map(prepSimpleOb);
 
                 const seriesData = new Array(candles.length);
@@ -531,6 +929,9 @@
                 }
                 candleSeries.setData(seriesData);
                 impulseRetraceSeries.setData(showWave ? impulsePoints : []);
+                syncPositionsToLogical();
+                syncPositionPriceLines();
+                syncToolMenus();
                 updateMarkersAndStats();
                 if (candles.length) {
                     chart.priceScale('right').applyOptions({ autoScale: true });
@@ -544,8 +945,7 @@
             function refreshOverlaysInBackground(sym, res) {
                 if (overlayAbort) overlayAbort.abort();
                 overlayAbort = new AbortController();
-                const query = `symbol=${encodeURIComponent(sym)}&resolution=${encodeURIComponent(res)}`;
-                fetch(`/api/ob_data?${query}`, { signal: overlayAbort.signal })
+                fetch(`/api/ob_data?symbol=${encodeURIComponent(sym)}&resolution=${encodeURIComponent(res)}`, { signal: overlayAbort.signal })
                     .then(r => r.ok ? r.json() : null)
                     .then(payload => {
                         if (!payload || sym !== activeSymbol || res !== activeResolution) return;
@@ -571,10 +971,7 @@
             function updateOhlcPanel(c, timeOverride = null) {
                 if (!c) return;
                 const ts = timeOverride !== null ? Number(timeOverride) : Number(c.time);
-                if (ts && ts !== lastFormattedTimeTs) {
-                    lastFormattedTimeTs = ts;
-                    lblCandleTime.textContent = fmtHeader.format(new Date(ts * 1000));
-                }
+                if (ts && ts !== lastFormattedTimeTs) { lastFormattedTimeTs = ts; lblCandleTime.textContent = fmtHeader.format(new Date(ts * 1000)); }
                 lblOpen.textContent = Number(c.open).toFixed(2);
                 lblHigh.textContent = Number(c.high).toFixed(2);
                 lblLow.textContent = Number(c.low).toFixed(2);
@@ -583,12 +980,11 @@
             }
 
             function updateCountdown() {
-                const interval = activeIntervalSec, now = Math.floor(Date.now() / 1000), left = interval - (now % interval);
+                const left = activeIntervalSec - (Math.floor(Date.now() / 1000) % activeIntervalSec);
                 const d = Math.floor(left / 86400), h = Math.floor((left % 86400) / 3600), m = Math.floor((left % 3600) / 60), s = left % 60;
                 lblTimer.textContent = d > 0 ? `${d}d ${pad2(h)}h ${pad2(m)}m` : h > 0 ? `${pad2(h)}:${pad2(m)}:${pad2(s)}` : `${pad2(m)}:${pad2(s)}`;
             }
-            updateCountdown();
-            setInterval(updateCountdown, 1000);
+            updateCountdown(); setInterval(updateCountdown, 1000);
 
             function shiftRange(zoomFactor, shiftFactor) {
                 const r = timeScale.getVisibleLogicalRange();
@@ -606,26 +1002,313 @@
             btnSimpleObToggle.addEventListener('click', () => { showSimpleObs = !showSimpleObs; btnSimpleObToggle.classList.toggle('active', showSimpleObs); scheduleDraw(); });
             btnWaveToggle.addEventListener('click', () => { showWave = !showWave; btnWaveToggle.classList.toggle('active', showWave); impulseRetraceSeries.setData(showWave ? impulsePoints : []); });
 
+            function setMeasureMode(on, clearExisting = true) {
+                measureMode = on;
+                if (on && posToolMode) setPosToolMode(null);
+                btnMeasureToggle.classList.toggle('active', on);
+                chartElement.classList.toggle('measuring', on || Boolean(posToolMode));
+                if (!on && clearExisting) { measureState = null; syncToolMenus(); scheduleDraw(); }
+            }
+
+            function getPointFromEvent(e) {
+                const rect = chartElement.getBoundingClientRect();
+                const x = e.clientX - rect.left, y = e.clientY - rect.top;
+                const logical = timeScale.coordinateToLogical(x), price = candleSeries.coordinateToPrice(y);
+                if (logical === null || price === null) return null;
+                return snapToOHLC(logical, price, y, e.ctrlKey || e.metaKey);
+            }
+
+            btnMeasureToggle.addEventListener('click', () => setMeasureMode(!measureMode, true));
+
+            chartElement.addEventListener('click', (e) => {
+                if (posToolMode) return;
+                if (!measureMode && !e.shiftKey) {
+                    if (measureState && measureState.locked) { measureState = null; syncToolMenus(); scheduleDraw(); }
+                    return;
+                }
+                const pt = getPointFromEvent(e);
+                if (!pt) return;
+                if (!measureState || measureState.locked) {
+                    measureState = { p1: pt, p2: pt, locked: false };
+                } else {
+                    measureState = { p1: measureState.p1, p2: pt, locked: true };
+                    setMeasureMode(false, false);
+                }
+                syncToolMenus(); scheduleDraw();
+            });
+
+            function setPosToolMode(mode) {
+                posToolMode = (posToolMode === mode) ? null : mode;
+                if (posToolMode) setMeasureMode(false, true);
+                btnLongPos.classList.toggle('active', posToolMode === 'long');
+                btnShortPos.classList.toggle('active', posToolMode === 'short');
+                chartElement.classList.toggle('measuring', Boolean(posToolMode) || measureMode);
+            }
+            btnLongPos.addEventListener('click', () => setPosToolMode('long'));
+            btnShortPos.addEventListener('click', () => setPosToolMode('short'));
+
+            // Lock & Remove Dropdown Menu handlers
+            btnLockMenu.addEventListener('click', e => { e.stopPropagation(); syncToolMenus(); closeAllPopovers(lockDropdown); lockDropdown.classList.toggle('open'); });
+            btnRemoveMenu.addEventListener('click', e => { e.stopPropagation(); syncToolMenus(); closeAllPopovers(removeDropdown); removeDropdown.classList.toggle('open'); });
+
+            btnLockSelected.addEventListener('click', () => {
+                const sel = getSelectedPos();
+                if (!sel) return;
+                sel.locked = !sel.locked;
+                savePositionsForSymbol(activeSymbol);
+                closeAllPopovers();
+                scheduleDraw();
+            });
+
+            btnLockAll.addEventListener('click', () => {
+                lockAllObjects = !lockAllObjects;
+                syncToolMenus();
+                closeAllPopovers();
+                scheduleDraw();
+            });
+
+            btnRemoveSelected.addEventListener('click', () => {
+                if (selectedPosId === null) return;
+                positions = positions.filter(p => p.id !== selectedPosId);
+                selectedPosId = null;
+                savePositionsForSymbol(activeSymbol);
+                syncPositionPriceLines();
+                closeAllPopovers();
+                scheduleDraw();
+            });
+
+            btnRemoveAll.addEventListener('click', () => {
+                positions = []; selectedPosId = null;
+                setPosToolMode(null); setMeasureMode(false, true);
+                savePositionsForSymbol(activeSymbol);
+                syncPositionPriceLines();
+                closeAllPopovers();
+                scheduleDraw();
+            });
+
+            // Double-click Position Edit Dialog (strict numeric-only)
+            function enforceDecimalOnly(inputEl) {
+                inputEl.addEventListener('input', () => {
+                    let v = inputEl.value.replace(/[^0-9.]/g, '');
+                    const parts = v.split('.');
+                    if (parts.length > 2) v = parts[0] + '.' + parts.slice(1).join('');
+                    inputEl.value = v;
+                });
+                inputEl.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') applyPosEdit();
+                });
+            }
+            [posInputEntry, posInputTp, posInputSl].forEach(enforceDecimalOnly);
+
+            function openPosEditModal(pos) {
+                editingPos = pos;
+                posModalTitle.textContent = pos.type === 'long' ? '🟢 Edit LONG Position' : '🔴 Edit SHORT Position';
+                posModalTitle.style.color = pos.type === 'long' ? '#4ade80' : '#f87171';
+                posInputEntry.value = Number(pos.entry).toFixed(2);
+                posInputTp.value = Number(pos.tp).toFixed(2);
+                posInputSl.value = Number(pos.sl).toFixed(2);
+                posModalError.style.display = 'none';
+                posEditModal.classList.add('open');
+                posInputEntry.focus();
+                posInputEntry.select();
+            }
+
+            function closePosEditModal() {
+                editingPos = null;
+                posEditModal.classList.remove('open');
+            }
+
+            function applyPosEdit() {
+                if (!editingPos) return;
+                const entry = parseFloat(posInputEntry.value);
+                const tp = parseFloat(posInputTp.value);
+                const sl = parseFloat(posInputSl.value);
+
+                if (!Number.isFinite(entry) || !Number.isFinite(tp) || !Number.isFinite(sl) || entry <= 0 || tp <= 0 || sl <= 0) {
+                    posModalError.textContent = 'Please enter valid positive numbers in all fields.';
+                    posModalError.style.display = 'block';
+                    return;
+                }
+                if (editingPos.type === 'long' && (tp < entry || sl > entry)) {
+                    posModalError.textContent = 'For LONG: Profit must be >= Entry and Stoploss <= Entry.';
+                    posModalError.style.display = 'block';
+                    return;
+                }
+                if (editingPos.type === 'short' && (tp > entry || sl < entry)) {
+                    posModalError.textContent = 'For SHORT: Profit must be <= Entry and Stoploss >= Entry.';
+                    posModalError.style.display = 'block';
+                    return;
+                }
+
+                editingPos.entry = entry;
+                editingPos.tp = tp;
+                editingPos.sl = sl;
+                savePositionsForSymbol(activeSymbol);
+                syncPositionPriceLines();
+                scheduleDraw();
+                closePosEditModal();
+            }
+
+            $('btn-pos-modal-close').addEventListener('click', closePosEditModal);
+            $('btn-pos-cancel').addEventListener('click', closePosEditModal);
+            $('btn-pos-save').addEventListener('click', applyPosEdit);
+            posEditModal.addEventListener('click', (e) => {
+                if (e.target === posEditModal) closePosEditModal();
+            });
+
+            function hitTestPosition(x, y) {
+                const tol = 10;
+                for (let i = positions.length - 1; i >= 0; i--) {
+                    const p = positions[i];
+                    const x1 = timeScale.logicalToCoordinate(p.startLogical), x2 = timeScale.logicalToCoordinate(p.endLogical);
+                    const yEntry = candleSeries.priceToCoordinate(p.entry), yTp = candleSeries.priceToCoordinate(p.tp), ySl = candleSeries.priceToCoordinate(p.sl);
+                    if (x1 === null || x2 === null || yEntry === null || yTp === null || ySl === null) continue;
+                    const left = Math.min(x1, x2), right = Math.max(x1, x2), top = Math.min(yTp, ySl, yEntry), bot = Math.max(yTp, ySl, yEntry);
+                    if (x < left - tol || x > right + tol || y < top - tol || y > bot + tol) continue;
+                    if (Math.abs(y - yTp) <= tol) return { pos: p, handle: 'tp' };
+                    if (Math.abs(y - ySl) <= tol) return { pos: p, handle: 'sl' };
+                    if (Math.abs(x - right) <= tol) return { pos: p, handle: 'right' };
+                    if (Math.abs(y - yEntry) <= tol || (x >= left && x <= right && y >= top && y <= bot)) return { pos: p, handle: 'entry' };
+                }
+                return null;
+            }
+
+            chartElement.addEventListener('pointerdown', (e) => {
+                if (e.button !== 0) return;
+                const rect = chartElement.getBoundingClientRect();
+                const x = e.clientX - rect.left, y = e.clientY - rect.top;
+
+                if (posToolMode) {
+                    const pt = getPointFromEvent(e);
+                    if (!pt) return;
+                    const pTop = candleSeries.coordinateToPrice(0), pBot = candleSeries.coordinateToPrice(cssH);
+                    const span = (pTop !== null && pBot !== null) ? Math.abs(pTop - pBot) : pt.price * 0.02;
+                    const risk = span * 0.08, isLong = posToolMode === 'long';
+                    const newPos = {
+                        id: Date.now(), type: posToolMode, locked: false,
+                        startLogical: pt.logical, endLogical: pt.logical + 14,
+                        entry: pt.price,
+                        tp: isLong ? pt.price + risk * 2 : pt.price - risk * 2,
+                        sl: isLong ? pt.price - risk : pt.price + risk
+                    };
+                    positions.push(newPos);
+                    selectedPosId = newPos.id;
+                    savePositionsForSymbol(activeSymbol);
+                    syncPositionPriceLines();
+                    setPosToolMode(null);
+                    scheduleDraw();
+                    e.stopPropagation();
+                    return;
+                }
+
+                const hit = hitTestPosition(x, y);
+                if (hit) {
+                    selectedPosId = hit.pos.id;
+                    syncPositionPriceLines();
+                    syncToolMenus();
+                    if (!isPosLocked(hit.pos)) {
+                        dragPos = {
+                            pos: hit.pos, handle: hit.handle,
+                            startLogical: timeScale.coordinateToLogical(x),
+                            startPrice: candleSeries.coordinateToPrice(y),
+                            orig: { ...hit.pos }
+                        };
+                        e.stopPropagation();
+                        e.preventDefault();
+                    }
+                    scheduleDraw();
+                } else if (selectedPosId !== null) {
+                    selectedPosId = null;
+                    syncPositionPriceLines();
+                    syncToolMenus();
+                    scheduleDraw();
+                }
+            }, { capture: true });
+
+            window.addEventListener('pointermove', (e) => {
+                if (!dragPos) return;
+                const rect = chartElement.getBoundingClientRect(), rawY = e.clientY - rect.top;
+                const curL = timeScale.coordinateToLogical(e.clientX - rect.left);
+                let curP = candleSeries.coordinateToPrice(rawY);
+                if (curL === null || curP === null) return;
+                if (dragPos.handle === 'tp' || dragPos.handle === 'sl') curP = snapToOHLC(curL, curP, rawY, e.ctrlKey || e.metaKey).price;
+
+                const p = dragPos.pos, o = dragPos.orig;
+                if (dragPos.handle === 'tp') p.tp = p.type === 'long' ? Math.max(p.entry, curP) : Math.min(p.entry, curP);
+                else if (dragPos.handle === 'sl') p.sl = p.type === 'long' ? Math.min(p.entry, curP) : Math.max(p.entry, curP);
+                else if (dragPos.handle === 'right') p.endLogical = Math.max(p.startLogical + 2, curL);
+                else if (dragPos.handle === 'entry') {
+                    const dL = curL - dragPos.startLogical, dP = curP - dragPos.startPrice;
+                    p.startLogical = o.startLogical + dL; p.endLogical = o.endLogical + dL;
+                    p.entry = o.entry + dP; p.tp = o.tp + dP; p.sl = o.sl + dP;
+                }
+                syncPositionPriceLines();
+                scheduleDraw();
+            }, { passive: true });
+
+            window.addEventListener('pointerup', () => {
+                if (dragPos) { dragPos = null; savePositionsForSymbol(activeSymbol); }
+            });
+
+            chartElement.addEventListener('dblclick', (e) => {
+                const rect = chartElement.getBoundingClientRect();
+                const hit = hitTestPosition(e.clientX - rect.left, e.clientY - rect.top);
+                if (hit && !isPosLocked(hit.pos)) {
+                    selectedPosId = hit.pos.id;
+                    syncPositionPriceLines();
+                    syncToolMenus();
+                    openPosEditModal(hit.pos);
+                }
+            });
+
+            window.addEventListener('keydown', (e) => {
+                if ((e.key === 'Control' || e.key === 'Meta') && !ctrlMagnetActive) { ctrlMagnetActive = true; updateMagnetUI(); }
+                if (e.key === 'Escape') {
+                    closePosEditModal();
+                    closeAllPopovers();
+                    if (measureMode || measureState) setMeasureMode(false, true);
+                    if (posToolMode) setPosToolMode(null);
+                    return;
+                }
+                if (posEditModal.classList.contains('open')) return;
+                if ((e.key === 'Delete' || e.key === 'Backspace') && selectedPosId !== null) {
+                    const sel = getSelectedPos();
+                    if (sel && !isPosLocked(sel)) {
+                        positions = positions.filter(p => p.id !== selectedPosId);
+                        selectedPosId = null;
+                        savePositionsForSymbol(activeSymbol);
+                        syncPositionPriceLines();
+                        scheduleDraw();
+                    }
+                }
+            });
+            window.addEventListener('keyup', e => { if ((e.key === 'Control' || e.key === 'Meta') && ctrlMagnetActive) { ctrlMagnetActive = false; updateMagnetUI(); } });
+            window.addEventListener('blur', () => { if (ctrlMagnetActive) { ctrlMagnetActive = false; updateMagnetUI(); } });
+
+            // OB Settings Popover handlers
             const parseOptNum = el => el.value.trim() === '' ? null : Number(el.value.trim());
-            btnObSettings.addEventListener('click', e => { e.stopPropagation(); obSettingsPopover.classList.toggle('open'); });
+            btnObSettings.addEventListener('click', e => { e.stopPropagation(); closeAllPopovers(obSettingsPopover); obSettingsPopover.classList.toggle('open'); });
             $('btn-ob-settings-close').addEventListener('click', () => obSettingsPopover.classList.remove('open'));
             $('btn-ob-apply-filter').addEventListener('click', () => {
                 obFilter.minMom = parseOptNum(inputMinMom); obFilter.maxMom = parseOptNum(inputMaxMom);
                 obFilter.min1m = parseOptNum(inputMin1m); obFilter.max1m = parseOptNum(inputMax1m);
                 obFilter.min3m = parseOptNum(inputMin3m); obFilter.max3m = parseOptNum(inputMax3m);
                 obFilter.min5m = parseOptNum(inputMin5m); obFilter.max5m = parseOptNum(inputMax5m);
+                saveObFilterForSymbol(activeSymbol);
                 updateMarkersAndStats();
                 obSettingsPopover.classList.remove('open');
             });
             $('btn-ob-reset-filter').addEventListener('click', () => {
-                [inputMinMom, inputMaxMom, inputMin1m, inputMax1m, inputMin3m, inputMax3m, inputMin5m, inputMax5m].forEach(el => el.value = '');
                 Object.keys(obFilter).forEach(k => obFilter[k] = null);
+                syncFilterInputs(); saveObFilterForSymbol(activeSymbol);
                 updateMarkersAndStats();
                 obSettingsPopover.classList.remove('open');
             });
             document.addEventListener('click', e => {
-                if (obSettingsPopover.classList.contains('open') && !obSettingsPopover.contains(e.target) && e.target !== btnObSettings) {
-                    obSettingsPopover.classList.remove('open');
+                if (!obSettingsPopover.contains(e.target) && e.target !== btnObSettings &&
+                    !lockDropdown.contains(e.target) && e.target !== btnLockMenu &&
+                    !removeDropdown.contains(e.target) && e.target !== btnRemoveMenu) {
+                    closeAllPopovers();
                 }
             });
 
@@ -669,7 +1352,7 @@
                     targetBar.high = Math.max(Number(targetBar.high), Number(incoming.high), targetBar.close);
                     targetBar.low = Math.min(Number(targetBar.low), Number(incoming.low), targetBar.close);
                 } else {
-                    targetBar = incoming; candlesByTime.set(incTime, targetBar); timeToIndexMap.set(incTime, timeToIndexMap.size);
+                    targetBar = incoming; candlesByTime.set(incTime, targetBar); timeToIndexMap.set(incTime, timeToIndexMap.size); candlesList.push(targetBar);
                 }
                 candleSeries.update(toSeriesCandle(targetBar));
                 latestCandle = targetBar;
@@ -680,6 +1363,9 @@
             function loadChartAndStream(sym, res) {
                 const requestId = ++currentLoadId;
                 activeSymbol = sym; activeResolution = res; activeIntervalSec = getResolutionSeconds(res);
+                closePosEditModal(); closeAllPopovers();
+                setMeasureMode(false, true); setPosToolMode(null);
+                loadPositionsForSymbol(sym); loadObFilterForSymbol(sym);
                 updateCountdown(); closeStreams();
                 loadAbort = new AbortController();
                 setStatus("● Loading...", "#ffb300");
